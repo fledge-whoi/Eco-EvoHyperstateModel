@@ -1,0 +1,553 @@
+---
+title: "Running the IBM"
+author: "Timothée Bonnet"
+date: "2024-10-28"
+output: 
+  html_document: 
+    toc: yes
+    highlight: tango
+    theme: cerulean
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval=FALSE)
+```
+
+# Packages
+
+```{r}
+library(doParallel) # to run simulations multicore
+library(ggpubr)
+library(popbio)
+library(tidyverse)
+library(viridis)
+```
+
+```{r}
+sessionInfo()
+```
+
+
+Load all simulation and post-treatment functions
+
+```{r}
+source("FunctionSimulsIPMQG.R")
+```
+
+
+# Define species
+
+We define 5 species as a collection of vital rates and life-history properties.
+
+```{r, eval=FALSE}
+species_info <- data.frame(species=1:5,
+                           fecundity = c(10.9868, 4.9958, 0.9987 ,0.3004 , 0.2286),
+                           fertility = c(10.9868/0.0965, 4.9958/0.25, 0.9987/0.385 ,0.3004/0.505 , 0.2286/0.8),
+                           adult_survival = c(0.0365, 0.2, 0.8, 0.93, 0.95), 
+                           juvenile_survival = c(0.0965, 0.25, 0.385, 0.505, 0.8),
+                           maturation_rate = c(0.9, 0.572, 0.4, 0.3, 0.07), 
+                           generation_time = c(2.0476, 2.3697, 6.2983, 15.8066, 23.7847))
+
+```
+
+Check expected asymptotic growth rate and stage structure
+
+```{r, eval=FALSE}
+species_info$lambda <- NA
+species_info$juv_prop <- NA
+
+for (i in 1:nrow(species_info))
+{
+  leslie_pop <- matrix(c(species_info$juvenile_survival[i] * ( 1 - species_info$maturation_rate[i]),
+         species_info$fecundity[i],
+         species_info$juvenile_survival[i] * species_info$maturation_rate[i],
+         species_info$adult_survival[i]),
+       nrow = 2, byrow = TRUE)
+
+
+  species_info$lambda[i] <- lambda(leslie_pop)
+  species_info$juv_prop[i] <- stable.stage(leslie_pop)[1]
+}
+
+write_csv(species_info, file = "species_info.csv")
+```
+
+```{r}
+species_info <- read.csv("species_info.csv")
+
+species_info
+
+```
+
+
+
+
+# Run across species and scenarios
+
+## Juvenile survival selection
+
+```{r, eval=FALSE}
+source("FunctionSimulsIPMQG.R")
+
+species_info <- read.csv("species_info.csv")
+
+VP <- 1
+heritability <- 0.2
+beta_s_j <- 0.15
+init_pop_size <- 2*100 # multiply by 2 to account for males
+nb_years <- 100
+
+K <- 2000 # safeguard carrying capacity to prevent very long simulations
+
+for (i in 1:nrow(species_info))
+{
+  survival_j <- species_info$juvenile_survival[i]
+  survival_a <- species_info$adult_survival[i]
+  maturation <- species_info$maturation_rate[i]
+  fecundity <- species_info$fertility[i]*2 # multiply by 2 to account for males # in the case of Juv survival we need to use Fertility instead of Fecundity
+  init_prop_juv <- species_info$juv_prop[i]
+
+  foreach (j = 1:100) %dopar%
+  {
+    if(! paste0("pop_sel_species_s_j_",i, "_rep_",j) %in% list.files("simulations") )
+      {
+      pop_sel <- main_simul(init_pop_size=init_pop_size, 
+                         start = 1, end = nb_years, 
+                         fecundity = fecundity, VP = VP, VA = heritability*VP,
+                         maturation_rate = maturation,
+                         surv_j = survival_j, surv_a = survival_a, beta_s_j = beta_s_j, init_prop_juv=init_prop_juv, 
+                         K=K)
+      save(pop_sel, file = paste0("simulations/pop_sel_species_s_j_",i, "_rep_",j))
+    }
+  print(j)
+  }
+}
+
+```
+
+### Post-hoc treatment of simulations
+
+Produce demographic data. This is quite slow (and could probably be optimized a lot).
+
+```{r, eval=FALSE}
+
+for (i in 1:nrow(species_info))
+{
+  foreach (j = 1:100) %dopar%
+  {
+    if(paste0("pop_sel_species_s_j_",i, "_rep_",j) %in% list.files("simulations") )
+      if(!paste0("pop_data_species_s_j_",i, "_rep_",j, ".csv") %in% list.files("simulations") )
+      {
+        load(paste0("simulations/pop_sel_species_s_j_",i, "_rep_",j))
+        pop_data <- produce_pop_data(pop_sel)
+        write_csv(pop_data, file = paste0("simulations/pop_data_species_s_j_",i, "_rep_",j, ".csv"))
+      }
+    print(j)
+  }
+}
+
+pop_data_all_s_j <- tibble()
+for (i in 1:nrow(species_info))
+{
+  for (j in 1:100)
+  {
+    pop_data <- read.csv(paste0("simulations/pop_data_species_s_j_",i, "_rep_",j, ".csv"))
+    pop_data$species <- i
+    pop_data$replicate <- j
+    pop_data_all_s_j <- bind_rows(pop_data_all_s_j, pop_data)
+  }
+}
+write.csv(pop_data_all_s_j, "simulations/pop_data_all_s_j.csv")
+
+```
+
+Produce data on average breeding values by cohort or by year:
+
+```{r, eval=FALSE}
+
+all_pop_s_j <- tibble()
+for (i in 1:nrow(species_info))
+{
+  for (j in 1:100)
+  {
+    if(paste0("pop_sel_species_s_j_",i, "_rep_",j) %in% list.files("simulations") )
+      {
+        load(paste0("simulations/pop_sel_species_s_j_",i, "_rep_",j))
+        pop_evol <- produce_evolution_data(pop_sel, minyear = 1)
+        pop_evol$species <- i
+        pop_evol$replicate <- j
+        all_pop_s_j <- bind_rows(all_pop_s_j, pop_evol)
+      }
+  }
+}
+write.csv(all_pop_s_j, file = "simulations/pop_evol_s_j.csv")
+
+# by year evolution
+all_pop_by_s_j <- tibble()
+for (i in 1:nrow(species_info))
+{
+  for (j in 1:100)
+  {
+    if(paste0("pop_sel_species_s_j_",i, "_rep_",j) %in% list.files("simulations") )
+      {
+        load(paste0("simulations/pop_sel_species_s_j_",i, "_rep_",j))
+        pop_evol <- produce_evolution_data_byyear(pop_sel, minyear = 1)
+        pop_evol$species <- i
+        pop_evol$replicate <- j
+        all_pop_by_s_j <- bind_rows(all_pop_by_s_j, pop_evol)
+    }
+  }
+}
+
+write.csv(all_pop_by_s_j, file = "simulations/pop_evol_by_s_j.csv")
+
+```
+
+
+
+## Adult survival selection
+
+```{r, eval=FALSE}
+source("FunctionSimulsIPMQG.R")
+
+library(tidyverse)
+species_info <- read.csv("species_info.csv")
+
+VP <- 1
+heritability <- 0.2
+beta_s_a <- 0.15
+init_pop_size <- 2*100 # multiply by 2 to account for males
+nb_years <- 100
+
+K <- 5000 #safeguard to prevent very long simulations
+
+for (i in 1:nrow(species_info))
+{
+  survival_j <- species_info$juvenile_survival[i]
+  survival_a <- species_info$adult_survival[i]
+  maturation <- species_info$maturation_rate[i]
+  fecundity <- species_info$fecundity[i]*2 # multiply by 2 to account for males
+  init_prop_juv <- species_info$juv_prop[i]
+
+  for (j in 1:100)
+  {
+    if(! paste0("pop_sel_species_sa_",i, "_rep_",j) %in% list.files("simulations") )
+      {
+      pop_sel <- main_simul(init_pop_size=init_pop_size, 
+                         start = 1, end = nb_years, 
+                         fecundity = fecundity, VP = VP, VA = heritability*VP,
+                         maturation_rate = maturation,
+                         surv_j = survival_j, surv_a = survival_a, beta_s_a=beta_s_a,
+                         init_prop_juv=init_prop_juv, 
+                         K=K)
+      save(pop_sel, file = paste0("simulations/pop_sel_species_sa_",i, "_rep_",j))
+    }
+  print(j)
+  }
+}
+
+```
+
+```{r, eval=FALSE}
+
+for (i in 1:nrow(species_info))
+{
+  for (j in 1:100)
+  {
+    if(paste0("pop_sel_species_sa_",i, "_rep_",j) %in% list.files("simulations") )
+      if(!paste0("pop_data_species_sa_",i, "_rep_",j, ".csv") %in% list.files("simulations") )
+      {
+        load(paste0("simulations/pop_sel_species_sa_",i, "_rep_",j))
+        pop_data <- produce_pop_data(pop_sel)
+        write_csv(pop_data, file = paste0("simulations/pop_data_species_sa_",i, "_rep_",j, ".csv"))
+      }
+    print(j)
+  }
+}
+
+pop_data_all_s_a <- tibble()
+
+for (i in 1:nrow(species_info))
+{
+  for (j in 1:100)
+  {
+    pop_data <- read.csv(paste0("simulations/pop_data_species_sa_",i, "_rep_",j, ".csv"))
+    pop_data$species <- i
+    pop_data$replicate <- j
+    pop_data_all_s_a <- bind_rows(pop_data_all_s_a, pop_data)
+  }
+}
+
+write.csv(pop_data_all_s_a, "simulations/pop_data_all_s_a.csv")
+```
+
+
+```{r, eval=FALSE}
+all_pop_s_a <- tibble()
+for (i in 1:nrow(species_info))
+{
+  for (j in 1:100)
+  {
+    if(paste0("pop_sel_species_sa_",i, "_rep_",j) %in% list.files("simulations") )
+      {
+        load(paste0("simulations/pop_sel_species_sa_",i, "_rep_",j))
+        pop_evol <- produce_evolution_data(pop_sel, minyear = 1)
+        pop_evol$species <- i
+        pop_evol$replicate <- j
+        all_pop_s_a <- bind_rows(all_pop_s_a, pop_evol)
+    }
+  }
+}
+
+write.csv(all_pop_s_a, file = "simulations/pop_evol_s_a.csv")
+
+#by year evolution
+all_pop_by_s_a <- tibble()
+for (i in 1:nrow(species_info))
+{
+  for (j in 1:100)
+  {
+    if(paste0("pop_sel_species_sa_",i, "_rep_",j) %in% list.files("simulations") )
+      {
+        load(paste0("simulations/pop_sel_species_sa_",i, "_rep_",j))
+        pop_evol <- produce_evolution_data_byyear(pop_sel, minyear = 1)
+        pop_evol$species <- i
+        pop_evol$replicate <- j
+        all_pop_by_s_a <- bind_rows(all_pop_by_s_a, pop_evol)
+    }
+  }
+}
+
+write.csv(all_pop_by_s_a, file = "simulations/pop_evol_by_s_a.csv")
+
+```
+
+
+## Fertility selection
+
+```{r, eval=FALSE}
+source("FunctionSimulsIPMQG.R")
+
+library(tidyverse)
+species_info <- read.csv("species_info.csv")
+
+VP <- 1
+heritability <- 0.2
+beta_f <- 0.15*2
+init_pop_size <- 2*100 # multiply by 2 to account for males
+nb_years <- 100
+
+K <- 5000 #safeguard to prevent very long simulations
+
+for (i in 1:nrow(species_info))
+{
+  survival_j <- species_info$juvenile_survival[i]
+  survival_a <- species_info$adult_survival[i]
+  maturation <- species_info$maturation_rate[i]
+  fecundity <- species_info$fecundity[i]*2 # multiply by 2 to account for males
+  init_prop_juv <- species_info$juv_prop[i]
+
+  for (j in 1:100)
+  {
+    if(! paste0("pop_sel_species_f_",i, "_rep_",j) %in% list.files("simulations") )
+      {
+      pop_sel <- main_simul(init_pop_size=init_pop_size, 
+                         start = 1, end = nb_years, 
+                         fecundity = fecundity, VP = VP, VA = heritability*VP,
+                         maturation_rate = maturation,
+                         surv_j = survival_j, surv_a = survival_a, beta_f=beta_f,
+                         init_prop_juv=init_prop_juv, 
+                         K=K, repro_model="poisson")
+      save(pop_sel, file = paste0("simulations/pop_sel_species_f_",i, "_rep_",j))
+    }
+  print(j)
+  }
+}
+
+```
+
+```{r, eval=FALSE}
+for (i in 1:nrow(species_info))
+{
+  for (j in 1:100)
+  {
+    if(paste0("pop_sel_species_f_",i, "_rep_",j) %in% list.files("simulations") )
+      if(!paste0("pop_data_species_f_",i, "_rep_",j, ".csv") %in% list.files("simulations") )
+      {
+        load(paste0("simulations/pop_sel_species_f_",i, "_rep_",j))
+        pop_data <- produce_pop_data(pop_sel)
+        write_csv(pop_data, file = paste0("simulations/pop_data_species_f_",i, "_rep_",j, ".csv"))
+      }
+    print(j)
+  }
+}
+
+pop_data_all_f <- tibble()
+for (i in 1:nrow(species_info))
+{
+  for (j in 1:100)
+  {
+    pop_data <- read.csv(paste0("simulations/pop_data_species_f_",i, "_rep_",j, ".csv"))
+    pop_data$species <- i
+    pop_data$replicate <- j
+    pop_data_all_f <- bind_rows(pop_data_all_f, pop_data)
+  }
+}
+write.csv(pop_data_all_f, "simulations/pop_data_all_f.csv")
+
+all_pop_f <- tibble()
+for (i in 1:nrow(species_info))
+{
+  for (j in 1:100)
+  {
+    if(paste0("pop_sel_species_f_",i, "_rep_",j) %in% list.files("simulations") )
+      {
+        load(paste0("simulations/pop_sel_species_f_",i, "_rep_",j))
+        pop_evol <- produce_evolution_data(pop_sel, minyear = 1)
+        pop_evol$species <- i
+        pop_evol$replicate <- j
+        all_pop_f <- bind_rows(all_pop_f, pop_evol)
+      }
+  }
+}
+write.csv(all_pop_f, file = "simulations/pop_evol_f.csv")
+
+#by year calculation instead of by cohort
+all_pop_f_by <- tibble()
+for (i in 1:nrow(species_info))
+{
+  for (j in 1:100)
+  {
+    if(paste0("pop_sel_species_f_",i, "_rep_",j) %in% list.files("simulations") )
+      {
+        load(paste0("simulations/pop_sel_species_f_",i, "_rep_",j))
+        pop_evol_by <- produce_evolution_data_byyear(pop_sel, minyear = 1)
+        pop_evol_by$species <- i
+        pop_evol_by$replicate <- j
+        all_pop_f_by <- bind_rows(all_pop_f_by, pop_evol_by)
+    }
+  }
+}
+
+write.csv(all_pop_by_f, file = "simulations/pop_evol_by_f.csv")
+
+```
+
+
+## Maturity selection
+
+```{r, eval=FALSE}
+source("FunctionSimulsIPMQG.R")
+
+library(tidyverse)
+species_info <- read.csv("species_info.csv")
+
+VP <- 1
+heritability <- 0.2
+beta_m <- 0.15
+init_pop_size <- 2*100 # multiply by 2 to account for males
+nb_years <- 100
+
+K <- 5000 #safeguard to prevent very long simulations
+
+for (i in 1:nrow(species_info))
+{
+  survival_j <- species_info$juvenile_survival[i]
+  survival_a <- species_info$adult_survival[i]
+  maturation <- species_info$maturation_rate[i]
+  fecundity <- species_info$fecundity[i]*2 # multiply by 2 to account for males
+  init_prop_juv <- species_info$juv_prop[i]
+
+  for (j in 1:100)
+  {
+    if(! paste0("pop_sel_species_m_",i, "_rep_",j) %in% list.files("simulations") )
+      {
+      pop_sel <- main_simul(init_pop_size=init_pop_size, 
+                         start = 1, end = nb_years, 
+                         fecundity = fecundity, VP = VP, VA = heritability*VP,
+                         maturation_rate = maturation,
+                         surv_j = survival_j, surv_a = survival_a, beta_m=beta_m,
+                         init_prop_juv=init_prop_juv, 
+                         K=K)
+      save(pop_sel, file = paste0("simulations/pop_sel_species_m_",i, "_rep_",j))
+    }
+  print(j)
+  }
+}
+
+```
+
+
+
+```{r, eval=FALSE}
+for (i in 1:nrow(species_info))
+{
+  for (j in 1:100)
+  {
+    if(paste0("pop_sel_species_m_",i, "_rep_",j) %in% list.files("simulations") )
+      if(!paste0("pop_data_species_m_",i, "_rep_",j, ".csv") %in% list.files("simulations") )
+      {
+        load(paste0("simulations/pop_sel_species_m_",i, "_rep_",j))
+        pop_data <- produce_pop_data(pop_sel)
+        write_csv(pop_data, file = paste0("simulations/pop_data_species_m_",i, "_rep_",j, ".csv"))
+      }
+    print(j)
+  }
+}
+
+pop_data_all_m <- tibble()
+
+for (i in 1:nrow(species_info))
+{
+  for (j in 1:100)
+  {
+    pop_data <- read.csv(paste0("simulations/pop_data_species_m_",i, "_rep_",j, ".csv"))
+    pop_data$species <- i
+    pop_data$replicate <- j
+    pop_data_all_m <- bind_rows(pop_data_all_m, pop_data)
+  }
+}
+
+write.csv(pop_data_all_m, "simulations/pop_data_all_m.csv")
+```
+
+```{r, eval=FALSE}
+all_pop_m <- tibble()
+for (i in 1:nrow(species_info))
+{
+  for (j in 1:100)
+  {
+    if(paste0("pop_sel_species_m_",i, "_rep_",j) %in% list.files("simulations") )
+      {
+        load(paste0("simulations/pop_sel_species_m_",i, "_rep_",j))
+        pop_evol <- produce_evolution_data(pop_sel, minyear = 1)
+        pop_evol$species <- i
+        pop_evol$replicate <- j
+        all_pop_m <- bind_rows(all_pop_m, pop_evol)
+    }
+  }
+}
+
+write.csv(all_pop_m, file = "simulations/pop_evol_m.csv")
+
+#by year calculation instead of by cohort
+all_pop_by_m <- tibble()
+for (i in 1:nrow(species_info))
+{
+  for (j in 1:100)
+  {
+    if(paste0("pop_sel_species_m_",i, "_rep_",j) %in% list.files("simulations") )
+      {
+        load(paste0("simulations/pop_sel_species_m_",i, "_rep_",j))
+        pop_evol <- produce_evolution_data_byyear(pop_sel, minyear = 1)
+        pop_evol$species <- i
+        pop_evol$replicate <- j
+        all_pop_by_m <- bind_rows(all_pop_by_m, pop_evol)
+    }
+  }
+}
+
+write.csv(all_pop_by_m, file = "simulations/pop_evol_by_m.csv")
+```

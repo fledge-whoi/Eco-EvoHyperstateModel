@@ -27,10 +27,8 @@ Load the packages needed to run the code:
 
 ```{r}
 library(doParallel) # to run simulations multicore
-library(ggpubr) # graphes
 library(popbio) # population matrix calculations
 library(tidyverse) # data wrangling
-library(viridis) # colours for graphes
 ```
 
 R-session and computer state when compiling this file:
@@ -84,7 +82,7 @@ for (i in 1:nrow(species_info))
 write_csv(species_info, file = "species_info.csv")
 ```
 
-```{r}
+```{r, echo=FALSE}
 species_info <- read.csv("species_info.csv")
 
 species_info

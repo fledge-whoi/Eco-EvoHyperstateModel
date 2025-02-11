@@ -47,6 +47,25 @@ BD_proj_mat <- function(B){
   return(A)
 }#end BD_proj_mat()
 
+#' GVLE
+#' 
+#' Function to get the probability density distribution of breeding values from the normal distribution given the additive genetic variance
+#' 
+#' @param zz breeding values for which to compute the density
+#' 
+#' @param Va additive genetic variance
+#' 
+#' @details
+#' There is not a factor 2 because the variance we want is the Mendelian segregation variance.
+#' 
+#' 
+#' @export
+
+GVLE <- function(zz, Va){
+  exp(-(zz^2)/Va)/sqrt(pi*Va)
+}
+
+
 #' MPM
 #' 
 #' Run a eco-evo deterministic matrix model
@@ -149,7 +168,6 @@ MPM <- function(Beta = 0.15, h2 = 0.2, xp=4 ,timeA=100, g = 40, Vp = 1,  nind = 
   Va_hat = vector(length = nit)
   Vp_hat = vector(length = nit)
 
-  #####
   A <- matrix(data=c(SJ*(1-Y), Fe, SJ*Y, SA), nrow=2, byrow = TRUE) #Leslie matrix
   f <- Fe/SJ
   eigenA <- eigen(A)
@@ -229,8 +247,7 @@ MPM <- function(Beta = 0.15, h2 = 0.2, xp=4 ,timeA=100, g = 40, Vp = 1,  nind = 
   #%% H matrix
   #% To construct the H matrix, we need the Ga matrix
   Vle <- Va
-  GVLE = function(zz){exp(-(zz^2)/Va)/sqrt(pi*Va)} # Define a new function that gets probabilities from the normal distribution; will intervene later in the loop
-  # There is not a factor 2 because the variance we want is the Mendelian segregation variance.
+
   
   #%% M matrix
   #% To construct the M matrix, we need the Ge matrix

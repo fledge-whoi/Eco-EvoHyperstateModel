@@ -1,0 +1,57 @@
+---
+title: "Running the EvoDemo-Hyper Matrix Population Model in R"
+author: "Timothée Bonnet"
+date: "2024-10-28"
+output: 
+  html_document: 
+    toc: yes
+    toc_float: true
+    toc_collapsed: true
+    toc_depth: 3
+    number_sections: true
+    highlight: tango
+    theme: cerulean
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This code is associated with the manuscript "Toward a unified approach to modeling adaptation among demographers and evolutionary ecologists" submitted to Methods in Ecology and Evolution (MEE) by Joanie Van de Walle, Jimmy Garnier, Timothée Bonnet and Stephanie Jenouvrier.
+
+# Set-up
+
+
+R-session and computer state when compiling this file:
+
+```{r, eval=TRUE}
+sessionInfo()
+```
+
+
+Load all MPM simulation functions:
+
+```{r, eval=TRUE}
+source("MPM_Functions.R")
+```
+
+
+# Define species
+
+We define 5 species as a collection of vital rates and life-history properties.
+
+```{r, eval=FALSE}
+species_info <- data.frame(species=1:5,
+                           fecundity = c(10.9868, 4.9958, 0.9987 ,0.3004 , 0.2286),
+                           fertility = c(10.9868/0.0965, 4.9958/0.25, 0.9987/0.385 ,0.3004/0.505 , 0.2286/0.8),
+                           adult_survival = c(0.0365, 0.2, 0.8, 0.93, 0.95), 
+                           juvenile_survival = c(0.0965, 0.25, 0.385, 0.505, 0.8),
+                           maturation_rate = c(0.9, 0.572, 0.4, 0.3, 0.07), 
+                           generation_time = c(2.0476, 2.3697, 6.2983, 15.8066, 23.7847))
+
+```
+
+
+

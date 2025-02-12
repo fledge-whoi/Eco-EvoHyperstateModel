@@ -99,8 +99,8 @@ GVLE <- function(zz, Va){
 #' 
 #' @export
 
-MPM <- function(Beta = 0.15, h2 = 0.2, xp=4 ,timeA=100, g = 40, Vp = 1,  nind = 100, 
-                Fe=1, SA=0.3, SJ=0.1,  S0=0.1, Y=0.8, selectedrate="Fe", selectmodel="logit", 
+MPM <- function(Beta = 0.15, h2 = 0.2, xp=4 ,timeA=100, g = 20, Vp = 1,  nind = 100, 
+                Fe=0.2286, SA=0.95, SJ=0.8,  S0=0.8, Y=0.07, selectedrate="Fe", selectmodel="logit", 
                 census = "prebreeding"){
   require(pracma) # for interpolation
   require(gsignal) # for 2D convolution
@@ -196,6 +196,7 @@ MPM <- function(Beta = 0.15, h2 = 0.2, xp=4 ,timeA=100, g = 40, Vp = 1,  nind = 
     }else{
       if (selectmodel =="logit"){
       beta <- Beta;
+      if( (f<=0) | (f>=1)) {stop("When using a logit model for selection the fertility rate (Fe/Sj) must be between 0 and 1 (excluded)")}
       f_pheno  <- 1/(1+exp(-(logit(f) + beta*midpoint_e)))
       dS <- Beta*f*(1-f)
       }
@@ -305,7 +306,7 @@ MPM <- function(Beta = 0.15, h2 = 0.2, xp=4 ,timeA=100, g = 40, Vp = 1,  nind = 
     nn <- apply(n, 2, sum)/ sum(n*binwidth_a)
     
     # Process #2.2 = Transmission of breeding  value
-    Gle <- GVLE(0.5*(midpoint2_a))
+    Gle <- GVLE(0.5*(midpoint2_a), Va = Va)
     H1 <- conv2(nn, Gle * binwidth_a)  #identical with matlab
     H2  <- conv2(H1*binwidth_a, t(n)) # important to transpose n!
     bb2 <- seq(from=2*midpoint_a[1], to = 2*midpoint_a[length(midpoint_a)], by=(binwidth_a/2))
@@ -359,7 +360,7 @@ MPM <- function(Beta = 0.15, h2 = 0.2, xp=4 ,timeA=100, g = 40, Vp = 1,  nind = 
 
   output <- list(T_GEN=T_GEN, V_ADAPT=V_ADAPT, LAMBDA0=LAMBDA0, V=V, 
                  Vp_hat=Vp_hat, Va_hat=Va_hat, Y_Z=Y_Z, SA_Z=SA_Z, SJ_Z=SJ_Z, f_Z=f_Z, MZ=MZ, 
-                 M_EBVSA=M_EBVSA, M_EBVSJ=M_EBVSJ, M_EBVS=M_EBVS) 
+                 M_EBVSA=M_EBVSA, M_EBVSJ=M_EBVSJ, M_EBVS=M_EBVS, pheno=pheno, midpoint_e=midpoint_e) 
   
   return(output)
 }#end MPM()

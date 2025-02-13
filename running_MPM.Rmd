@@ -26,8 +26,9 @@ This code is associated with the manuscript "Toward a unified approach to modeli
 Packages that are needed to run the MPM function:
 
 ```{r}
-library(pracma)
-library(gsignal)
+library(pracma) # for data wrangling and plotting
+library(gsignal) # for population growth rate
+library(purrr) # for reformatting output
 ```
 
 
@@ -69,44 +70,280 @@ species_info <- data.frame(species=1:5,
 
 ```
 
-#
+# Demonstration
+
+## An example
+
+A single function is called to run the EvoDemo-Hyper Matrix Population Model (MPM). 
+
+We start by demonstrating the use of the function for species 1, using default parameters as used in the manuscript (this should take a few seconds):
 
 ```{r}
-output1 <- MPM(g = 20, Beta = 0.45, h2 = 0.6, xp = 8)
+output1 <- MPM(Fe = species_info$fecundity[1], 
+               SA = species_info$adult_survival[1],
+               SJ = species_info$juvenile_survival[1],
+               S0 = species_info$juvenile_survival[1],
+               Y = species_info$maturation_rate[1])
 
 ```
 
+Note that we use the same survival probability, `species_info$juvenile_survival[1]`, for `SJ` (survival probability for juvenile individuals, who have not matured yet) and `S0` (survival probability on the birth year). It is possible to use different probabilities for those two rates, as was done in the appendix of the manuscript.
+
+The output contains lots of information. We can check the distribution of phenotypes through time in `$pheno_distribution`.
 
 ```{r}
-pheno_distribution <- output1$pheno
-colnames(pheno_distribution) <- 1:ncol(pheno_distribution)
-pheno_distribution <- as_tibble(pheno_distribution) 
-pheno_distribution$phenotypic_class <- 1:nrow(pheno_distribution)
-pheno_distribution$phenotypic_midvalue <- output1$midpoint_e
-pheno_distribution <- pheno_distribution %>% pivot_longer(cols = 1:(ncol(pheno_distribution)-2), names_to = "year", values_to = "density", names_transform = list(year = as.integer))
+pheno_distribution <- output1$pheno_distribution
 ```
 
-```{r}
-pheno_distribution %>% ggplot(aes(x=year, y=density, colour=as.factor(phenotypic_class))) + geom_line()
+We can visualise the number of individuals expected in each phenotypic class through 100 years of simulation:
 
+```{r}
+pheno_distribution %>% ggplot(aes(x=year, y=density, colour=as.factor(phenotypic_midvalue))) + geom_line()
+```
+
+
+The distribution of phenotypes every 20 years:
+
+```{r}
 pheno_distribution %>% filter(year %in% seq( from=1, to =101, by=20)) %>%
-  ggplot(aes(x=phenotypic_class, y=density, fill=as.factor(phenotypic_class))) +
+  ggplot(aes(x=phenotypic_midvalue, y=density, fill=as.factor(phenotypic_midvalue))) +
   geom_col() +
-  facet_wrap(~year) + 
-  theme_bw()
+  facet_wrap(~year, scales = "free_y", labeller = ) + 
+  theme_bw() +
+  theme(legend.position = "none")
+```
 
+
+The mean breeding values among adults and juveniles through time:
+
+```{r}
+BV <- bind_cols(adult = output1$M_EBVSA, juvenile=output1$M_EBVSJ, year=1:length(output1$M_EBVSA))
+BV <- BV %>% pivot_longer(cols=1:2, values_to = "mean_breeding_value", names_to = "age_class")
+
+ggplot(BV, aes(x=year, y=mean_breeding_value, color=age_class)) + 
+  geom_line() + theme_bw() 
+```
+
+## Options
+
+We can change the number of phenotypic and breeding value classes considered (`g=`). The default here was 20, which takes about 5 seconds on this machine. With only 10 classes the algorithm takes about 1 second:
+
+```{r}
+output2 <- MPM(g = 10, 
+               Fe = species_info$fecundity[1], 
+               SA = species_info$adult_survival[1],
+               SJ = species_info$juvenile_survival[1],
+               S0 = species_info$juvenile_survival[1],
+               Y = species_info$maturation_rate[1])
+
+```
+
+Using 40 classes takes much more RAM and CPU-time (On this machine, around 20 minutes allocating 14 CPUs), much more than the MATLAB version of the algorithm.
+
+The initial phenotype has a mean of zero. We set the range of phenotypes considered around that value with the parameter `xp=`. The default is 4. We can increase it to 8 so give more space for the trait to evolve:
+
+```{r}
+output3 <- MPM(g = 20, 
+               xp = 8,
+               Fe = species_info$fecundity[1], 
+               SA = species_info$adult_survival[1],
+               SJ = species_info$juvenile_survival[1],
+               S0 = species_info$juvenile_survival[1],
+               Y = species_info$maturation_rate[1])
+```
+
+
+```{r}
+output3$pheno_distribution %>% 
+  filter(year %in% seq( from=1, to =101, by=20)) %>%
+  ggplot(aes(x=phenotypic_midvalue, y=density, fill=as.factor(phenotypic_midvalue))) +
+  geom_col() +
+  facet_wrap(~year, scales = "free_y", labeller = ) + 
+  theme_bw() +
+  theme(legend.position = "none")
+```
+
+Given the broader range there was not enough time to see much change. We can increase the number of timesteps from 100 to 500:
+
+```{r}
+output4 <- MPM(g = 20, 
+               xp = 8,
+               timeA = 500,
+               Fe = species_info$fecundity[1], 
+               SA = species_info$adult_survival[1],
+               SJ = species_info$juvenile_survival[1],
+               S0 = species_info$juvenile_survival[1],
+               Y = species_info$maturation_rate[1])
+```
+
+```{r}
+output4$pheno_distribution %>% 
+  filter(year %in% seq( from=1, to =501, by=50)) %>%
+  ggplot(aes(x=phenotypic_midvalue, y=density, fill=as.factor(phenotypic_midvalue))) +
+  geom_col() +
+  facet_wrap(~year, scales = "free_y", labeller = ) + 
+  theme_bw() +
+  theme(legend.position = "none")
+```
+
+Eventually the phenotypic distribution hits the boundary of the highest possible phenotype, which makes the simulation unreliable from that point in time (around year 350 here).
+Also, note the absurd exponential population growth, evidenced by the y-axis.
+
+
+We can check that without heritability there is no change (we set the heritability to 0.01 as it cannot be exactly 0 or 1):
+
+```{r}
+output_nobeta <- MPM(g = 20, 
+               xp = 4,
+               timeA = 100,
+               h2 = 0.2,
+               Beta = 0,
+               nind = 100,
+               Fe = species_info$fecundity[4], 
+               SA = species_info$adult_survival[4],
+               SJ = species_info$juvenile_survival[4],
+               S0 = species_info$juvenile_survival[4],
+               Y = species_info$maturation_rate[4])
 
 ```
 
 ```{r}
-output1$M_EBVSA
-output1$M_EBVSJ
+output_nobeta$pheno_distribution %>% 
+  filter(year %in% seq( from=1, to =101, by=10)) %>%
+  ggplot(aes(x=phenotypic_midvalue, y=density, fill=as.factor(phenotypic_midvalue))) +
+  geom_col() +
+  facet_wrap(~year, scales = "free_y", labeller = ) + 
+  theme_bw() +
+  theme(legend.position = "none")
+
+output_nobeta$pheno_distribution %>%
+  group_by(year) %>%
+  summarise(sum(density))
+
+plot(output_nobeta$popsize)
+```
+
+
+
+```{r}
+output_nobeta_corrected <- MPM_corrected(g = 20, 
+               xp = 4,
+               timeA = 100,
+               h2 = 0.5,
+               Beta = 0,
+               Fe = species_info$fecundity[4], 
+               SA = species_info$adult_survival[4],
+               SJ = species_info$juvenile_survival[4],
+               S0 = species_info$juvenile_survival[4],
+               Y = species_info$maturation_rate[4])
+
 ```
 
 ```{r}
-(0.2286/0.8)*(1-0.2286/0.8)*0.45*0.6*100/output1$T_GEN
+output_nobeta_corrected$pheno_distribution %>% 
+  filter(year %in% seq( from=1, to =101, by=10)) %>%
+  ggplot(aes(x=phenotypic_midvalue, y=density, fill=as.factor(phenotypic_midvalue))) +
+  geom_col() +
+  facet_wrap(~year, scales = "free_y", labeller = ) + 
+  theme_bw() +
+  theme(legend.position = "none")
+
+output_nobeta_corrected$pheno_distribution %>%
+  group_by(year) %>%
+  summarise(sum(density))
+
+plot(output_nobeta_corrected$popsize)
 
 ```
 
 
 
+
+```{r}
+output_noh2 <- MPM(g = 20, 
+               xp = 8,
+               timeA = 100,
+               h2 = 0.0001,
+               Beta = 0,
+               Fe = species_info$fecundity[1], 
+               SA = species_info$adult_survival[1],
+               SJ = species_info$juvenile_survival[1],
+               S0 = species_info$juvenile_survival[1],
+               Y = species_info$maturation_rate[1])
+
+```
+
+```{r}
+output_noh2$pheno_distribution %>% 
+  filter(year %in% seq( from=1, to =101, by=10)) %>%
+  ggplot(aes(x=phenotypic_midvalue, y=density, fill=as.factor(phenotypic_midvalue))) +
+  geom_col() +
+  facet_wrap(~year, scales = "free_y", labeller = ) + 
+  theme_bw() +
+  theme(legend.position = "none")
+```
+
+But rapid change with high heritability:
+
+```{r}
+output_highh2 <- MPM(g = 20, 
+               xp = 8,
+               timeA = 100,
+               h2 = 0.01,
+               Fe = species_info$fecundity[1], 
+               SA = species_info$adult_survival[1],
+               SJ = species_info$juvenile_survival[1],
+               S0 = species_info$juvenile_survival[1],
+               Y = species_info$maturation_rate[1])
+
+```
+
+```{r}
+output_highh2$pheno_distribution %>% 
+  filter(year %in% seq( from=1, to =101, by=10)) %>%
+  ggplot(aes(x=phenotypic_midvalue, y=density, fill=as.factor(phenotypic_midvalue))) +
+  geom_col() +
+  facet_wrap(~year, scales = "free_y", labeller = ) + 
+  theme_bw() +
+  theme(legend.position = "none")
+```
+
+
+
+
+
+```{r}
+output_noh2 <- MPM(g = 20, 
+               xp = 8,
+               timeA = 100,
+               h2 = 0.01, Beta = 0,
+               Fe = species_info$fecundity[1], 
+               SA = species_info$adult_survival[1],
+               SJ = species_info$juvenile_survival[1],
+               S0 = species_info$juvenile_survival[1],
+               Y = species_info$maturation_rate[1])
+
+```
+
+```{r}
+output_noh2 <- MPM(g = 20, 
+               xp = 8,
+               timeA = 100,
+               h2 = 0.01, Beta = 0,
+               Fe = species_info$fecundity[2], 
+               SA = species_info$adult_survival[2],
+               SJ = species_info$juvenile_survival[2],
+               S0 = species_info$juvenile_survival[2],
+               Y = species_info$maturation_rate[2])
+
+```
+
+```{r}
+output_noh2$pheno_distribution %>% 
+  filter(year %in% seq( from=1, to =101, by=10)) %>%
+  ggplot(aes(x=phenotypic_midvalue, y=density, fill=as.factor(phenotypic_midvalue))) +
+  geom_col() +
+  facet_wrap(~year, scales = "free_y", labeller = ) + 
+  theme_bw() +
+  theme(legend.position = "none")
+```

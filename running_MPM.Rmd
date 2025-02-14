@@ -59,7 +59,7 @@ source("MPM_Functions.R")
 
 We define 5 species as a collection of vital rates and life-history properties.
 
-```{r, eval=FALSE}
+```{r}
 species_info <- data.frame(species=1:5,
                            fecundity = c(10.9868, 4.9958, 0.9987 ,0.3004 , 0.2286),
                            fertility = c(10.9868/0.0965, 4.9958/0.25, 0.9987/0.385 ,0.3004/0.505 , 0.2286/0.8),
@@ -92,10 +92,15 @@ Note that we use the same survival probability, `species_info$juvenile_survival[
 
 The output contains lots of information. 
 
+```{r}
+str(output1)
+```
+
+
 To start with, we can visualise population size:
 
 ```{r}
-plot(output1$popsize)
+plot(output1$properties_per_year[,c("year", "N")])
 ```
 
 We can extract the distribution of phenotypes through time in `$pheno_distribution`:
@@ -116,7 +121,7 @@ The distribution of phenotypes every 20 years:
 pheno_distribution %>% filter(year %in% seq( from=1, to =101, by=20)) %>%
   ggplot(aes(x=phenotypic_midvalue, y=density, fill=as.factor(phenotypic_midvalue))) +
   geom_col() +
-  facet_wrap(~year, scales = "free_y", labeller = ) + 
+  facet_wrap(~year, scales = "free_y", labeller = ) + #######################################################
   theme_bw() +
   theme(legend.position = "none")
 ```
@@ -125,14 +130,18 @@ pheno_distribution %>% filter(year %in% seq( from=1, to =101, by=20)) %>%
 The mean breeding values among adults and juveniles through time:
 
 ```{r}
-BV <- bind_cols(adult = output1$M_EBVSA, juvenile=output1$M_EBVSJ, year=1:length(output1$M_EBVSA))
-BV <- BV %>% pivot_longer(cols=1:2, values_to = "mean_breeding_value", names_to = "age_class")
+BV <- output1$properties_per_year[,c("year", "M_EBVSA", "M_EBVSJ")]
+colnames(BV) <- c("year", "adult", "juvenile")
+BV <- BV %>% pivot_longer(cols=2:3, values_to = "mean_breeding_value", names_to = "age_class")
 
 ggplot(BV, aes(x=year, y=mean_breeding_value, color=age_class)) + 
+  ylim(c(-4, +4)) + 
   geom_line() + theme_bw() 
 ```
 
 ## Options
+
+### Phenotypic classes
 
 We can change the number of phenotypic and breeding value classes considered (`g=`). The default here was 20, which takes about 5 seconds on this machine. With only 10 classes the algorithm takes about 1 second:
 
@@ -208,7 +217,9 @@ output4$pheno_distribution %>%
 Eventually the phenotypic distribution hits the boundary of the highest possible phenotype, which makes the simulation unreliable from that point in time (around year 350 here).
 Also, note the absurd exponential population growth, evidenced by the y-axis. This is expected as the model consider only directional selection and does not contain density dependence.
 
-We can check that without heritability there is no change (we set the heritability to 0.01 as it cannot be exactly 0 or 1):
+### Heritability and selection
+
+We can check that without selection there is no phenotypic or genetic change:
 
 ```{r}
 output_nobeta <- MPM(g = 20, 
@@ -234,20 +245,39 @@ output_nobeta$pheno_distribution %>%
   theme_bw() +
   theme(legend.position = "none")
 
-output_nobeta$pheno_distribution %>%
-  group_by(year) %>%
-  summarise(sum(density))
+```
 
-plot(output_nobeta$popsize)
+```{r}
+BV <- output_nobeta$properties_per_year[,c("year", "M_EBVSA", "M_EBVSJ")]
+colnames(BV) <- c("year", "adult", "juvenile")
+BV <- BV %>% pivot_longer(cols=2:3, values_to = "mean_breeding_value", names_to = "age_class")
+
+ggplot(BV, aes(x=year, y=mean_breeding_value, color=age_class)) + 
+  ylim(c(-4, +4)) + 
+  geom_line() + theme_bw() 
+```
+
+Note however that the population size tends to increase after an initial drop:
+
+```{r}
+plot(output_nobeta$properties_per_year[,c("year", "N")])
+```
+
+The asymptotic population growth rate is constant as there is no adaptation, but it is very slightly greater than 1:
+
+```{r}
+plot(output_nobeta$properties_per_year[,c("year", "lambda")])
 ```
 
 
+When there is selection but no heritability (we set the heritability to 0.001 as it cannot be exactly 0 or 1):
+ 
 ```{r}
-output_nobet_smallh2 <- MPM(g = 20, 
+output_smallh2 <- MPM(g = 20, 
                xp = 4,
                timeA = 100,
-               h2 = 0.001,
-               Beta = 0,
+               h2 = 0.01,
+               Beta = 0.15,
                nind = 100,
                Fe = species_info$fecundity[4], 
                SA = species_info$adult_survival[4],
@@ -257,209 +287,36 @@ output_nobet_smallh2 <- MPM(g = 20,
 
 ```
 
+We get a warning message. The dynamic is not necessarily wrong, but maybe not what you expected:
+
+population size increases more:
+
 ```{r}
-output_nobet_smallh2$pheno_distribution %>% 
+plot(output_smallh2$properties_per_year[,c("year", "N")])
+```
+
+Due to an initial increase than stabilization of lambda:
+
+```{r}
+plot(output_smallh2$properties_per_year[,c("year", "lambda")])
+```
+
+What we see is a little bit of adaptation, eroding away the additive genetic variance:
+
+```{r}
+plot(output_smallh2$properties_per_year[,c("year", "Va")])
+```
+
+This erosion may be seen as realistic, but also as an artefact of the algorithm. We do not model genes explicitly, so we do not have a clear prediction of what should happen to Va.
+
+```{r}
+output_smallh2$pheno_distribution %>% 
   filter(year %in% seq( from=1, to =101, by=10)) %>%
   ggplot(aes(x=phenotypic_midvalue, y=density, fill=as.factor(phenotypic_midvalue))) +
   geom_col() +
-  facet_wrap(~year, scales = "free_y", labeller = ) + 
+  facet_wrap(~year, scales = "free_y") + 
   theme_bw() +
   theme(legend.position = "none")
 
-output_nobet_smallh2$pheno_distribution %>%
-  group_by(year) %>%
-  summarise(sum(density))
 
-plot(output_nobet_smallh2$popsize)
-```
-
-
-
-```{r}
-output_nobeta_corrected <- MPM_corrected(g = 20, 
-               xp = 4,
-               timeA = 100,
-               h2 = 0.5,
-               Beta = 0,
-               Fe = species_info$fecundity[4], 
-               SA = species_info$adult_survival[4],
-               SJ = species_info$juvenile_survival[4],
-               S0 = species_info$juvenile_survival[4],
-               Y = species_info$maturation_rate[4])
-
-```
-
-```{r}
-output_nobeta_corrected$pheno_distribution %>% 
-  filter(year %in% seq( from=1, to =101, by=10)) %>%
-  ggplot(aes(x=phenotypic_midvalue, y=density, fill=as.factor(phenotypic_midvalue))) +
-  geom_col() +
-  facet_wrap(~year, scales = "free_y", labeller = ) + 
-  theme_bw() +
-  theme(legend.position = "none")
-
-output_nobeta_corrected$pheno_distribution %>%
-  group_by(year) %>%
-  summarise(sum(density))
-
-plot(output_nobeta_corrected$popsize)
-
-```
-
-
-
-```{r}
-output_nobeta_corrected_h01 <- MPM_corrected(g = 20, 
-               xp = 4,
-               timeA = 100,
-               h2 = 0.0001,
-               Beta = 0,
-               Fe = species_info$fecundity[4], 
-               SA = species_info$adult_survival[4],
-               SJ = species_info$juvenile_survival[4],
-               S0 = species_info$juvenile_survival[4],
-               Y = species_info$maturation_rate[4])
-
-```
-
-```{r}
-output_nobeta_corrected_h01$pheno_distribution %>% 
-  filter(year %in% seq( from=1, to =101, by=10)) %>%
-  ggplot(aes(x=phenotypic_midvalue, y=density, fill=as.factor(phenotypic_midvalue))) +
-  geom_col() +
-  facet_wrap(~year, scales = "free_y", labeller = ) + 
-  theme_bw() +
-  theme(legend.position = "none")
-
-output_nobeta_corrected_h01$pheno_distribution %>%
-  group_by(year) %>%
-  summarise(sum(density))
-
-plot(output_nobeta_corrected_h01$popsize)
-
-```
-
-
-```{r}
-output_nobeta_corrected_h01_lvp <- MPM_corrected(g = 20, 
-               xp = 16,
-               Vp = 4,
-               timeA = 100,
-               h2 = 0.01,
-               Beta = 0,
-               Fe = species_info$fecundity[4], 
-               SA = species_info$adult_survival[4],
-               SJ = species_info$juvenile_survival[4],
-               S0 = species_info$juvenile_survival[4],
-               Y = species_info$maturation_rate[4])
-
-```
-
-```{r}
-output_nobeta_corrected_h01_lvp$pheno_distribution %>% 
-  filter(year %in% seq( from=1, to =101, by=10)) %>%
-  ggplot(aes(x=phenotypic_midvalue, y=density, fill=as.factor(phenotypic_midvalue))) +
-  geom_col() +
-  facet_wrap(~year, scales = "free_y", labeller = ) + 
-  theme_bw() +
-  theme(legend.position = "none")
-
-output_nobeta_corrected_h01_lvp$pheno_distribution %>%
-  group_by(year) %>%
-  summarise(sum(density))
-
-plot(output_nobeta_corrected_h01_lvp$popsize)
-
-```
-
-
-
-
-```{r}
-output_noh2 <- MPM(g = 20, 
-               xp = 8,
-               timeA = 100,
-               h2 = 0.0001,
-               Beta = 0,
-               Fe = species_info$fecundity[1], 
-               SA = species_info$adult_survival[1],
-               SJ = species_info$juvenile_survival[1],
-               S0 = species_info$juvenile_survival[1],
-               Y = species_info$maturation_rate[1])
-
-```
-
-```{r}
-output_noh2$pheno_distribution %>% 
-  filter(year %in% seq( from=1, to =101, by=10)) %>%
-  ggplot(aes(x=phenotypic_midvalue, y=density, fill=as.factor(phenotypic_midvalue))) +
-  geom_col() +
-  facet_wrap(~year, scales = "free_y", labeller = ) + 
-  theme_bw() +
-  theme(legend.position = "none")
-```
-
-But rapid change with high heritability:
-
-```{r}
-output_highh2 <- MPM(g = 20, 
-               xp = 8,
-               timeA = 100,
-               h2 = 0.01,
-               Fe = species_info$fecundity[1], 
-               SA = species_info$adult_survival[1],
-               SJ = species_info$juvenile_survival[1],
-               S0 = species_info$juvenile_survival[1],
-               Y = species_info$maturation_rate[1])
-
-```
-
-```{r}
-output_highh2$pheno_distribution %>% 
-  filter(year %in% seq( from=1, to =101, by=10)) %>%
-  ggplot(aes(x=phenotypic_midvalue, y=density, fill=as.factor(phenotypic_midvalue))) +
-  geom_col() +
-  facet_wrap(~year, scales = "free_y", labeller = ) + 
-  theme_bw() +
-  theme(legend.position = "none")
-```
-
-
-
-
-
-```{r}
-output_noh2 <- MPM(g = 20, 
-               xp = 8,
-               timeA = 100,
-               h2 = 0.01, Beta = 0,
-               Fe = species_info$fecundity[1], 
-               SA = species_info$adult_survival[1],
-               SJ = species_info$juvenile_survival[1],
-               S0 = species_info$juvenile_survival[1],
-               Y = species_info$maturation_rate[1])
-
-```
-
-```{r}
-output_noh2 <- MPM(g = 20, 
-               xp = 8,
-               timeA = 100,
-               h2 = 0.01, Beta = 0,
-               Fe = species_info$fecundity[2], 
-               SA = species_info$adult_survival[2],
-               SJ = species_info$juvenile_survival[2],
-               S0 = species_info$juvenile_survival[2],
-               Y = species_info$maturation_rate[2])
-
-```
-
-```{r}
-output_noh2$pheno_distribution %>% 
-  filter(year %in% seq( from=1, to =101, by=10)) %>%
-  ggplot(aes(x=phenotypic_midvalue, y=density, fill=as.factor(phenotypic_midvalue))) +
-  geom_col() +
-  facet_wrap(~year, scales = "free_y", labeller = ) + 
-  theme_bw() +
-  theme(legend.position = "none")
 ```

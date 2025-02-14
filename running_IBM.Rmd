@@ -1,10 +1,14 @@
 ---
-title: "Running the IBM"
+title: "Running the Individual Based Model"
 author: "Timothée Bonnet"
 date: "2024-10-28"
 output: 
   html_document: 
     toc: yes
+    toc_float: true
+    toc_collapsed: true
+    toc_depth: 3
+    number_sections: true
     highlight: tango
     theme: cerulean
 editor_options: 
@@ -15,25 +19,29 @@ editor_options:
 knitr::opts_chunk$set(echo = TRUE, eval=FALSE)
 ```
 
-# Packages
+This code is associated with the manuscript "Toward a unified approach to modeling adaptation among demographers and evolutionary ecologists" submitted to Methods in Ecology and Evolution (MEE) by Joanie Van de Walle, Jimmy Garnier, Timothée Bonnet and Stephanie Jenouvrier.
+
+# Set-up
+
+Load the packages needed to run the code:
 
 ```{r}
 library(doParallel) # to run simulations multicore
-library(ggpubr)
-library(popbio)
-library(tidyverse)
-library(viridis)
+library(popbio) # population matrix calculations
+library(tidyverse) # data wrangling
 ```
 
-```{r}
+R-session and computer state when compiling this file:
+
+```{r, eval=TRUE}
 sessionInfo()
 ```
 
 
-Load all simulation and post-treatment functions
+Load all IBM simulation and post-treatment functions:
 
-```{r}
-source("FunctionSimulsIPMQG.R")
+```{r, eval=TRUE}
+source("IBM_Function.R")
 ```
 
 
@@ -74,7 +82,7 @@ for (i in 1:nrow(species_info))
 write_csv(species_info, file = "species_info.csv")
 ```
 
-```{r}
+```{r, echo=FALSE}
 species_info <- read.csv("species_info.csv")
 
 species_info
@@ -84,9 +92,38 @@ species_info
 
 
 
-# Run across species and scenarios
+# Run the IBM across species and vital rates
 
-## Juvenile survival selection
+We run the IBM one vital rate at the time, looping over the species. 
+
+In order to speed up computation we use parallel computing for the inner for-loop. Assuming you have 4 independent cores available to run the IBM, you can start the virtual cluster with:
+
+```{r, eval=FALSE}
+cl <- makeCluster(4)
+registerDoParallel(cl)
+```
+
+If you have more cores available, for instance 20 you would use:
+
+```{r, eval=FALSE}
+cl <- makeCluster(20)
+registerDoParallel(cl)
+```
+
+After running one of the for-loops below you should close the virtual cluster with:
+
+```{r, eval=FALSE}
+stopCluster(cl)
+```
+
+This will shut down the background R-sessions.
+
+
+If you do not want to use parallel computing, you should replace `foreach (j = 1:100) %dopar% ` with `for (j in 1:100) `.
+
+
+## Juvenile survival selection 
+
 
 ```{r, eval=FALSE}
 source("FunctionSimulsIPMQG.R")

@@ -4,12 +4,14 @@ This repository contains code associated with the manuscript "Toward a unified a
 
 ## Overview
  
-The EvoDemo-Hyper MPM model introduces a new approach that incorporates the genetic inheritance of quantitative traits, enabling rapid computation of evolutionary and demographic dynamics. The model is evaluated against individual-based simulations (IBM) and provides analytical approximations for adaptation rates across six distinct scales in response to selection. The study demonstrates that, while different modeling approaches yield equivalent results for the same biological scenario, semantic distinctions between fields may sometimes obscure these similarities.
+The EvoDemo-Hyper MPM model introduces a new approach that incorporates the genetic inheritance of quantitative traits, enabling rapid computation of evolutionary and demographic dynamics. The model is evaluated against individual-based simulations (IBM) and provides analytical approximations for adaptation rates across six distinct scales in response to selection. The study demonstrates that, while different modelling approaches yield equivalent results for the same biological scenario, semantic distinctions between fields may sometimes obscure these similarities.
 
 ## Contents
 
-R Code (IBM and Theoretical Derivations): Developed by Timothée Bonnet, the R scripts include code to run IBM simulations and compute theoretical derivations.
-MATLAB Code (EvoDemo-Hyper MPM): Developed by Stephanie Jenouvrier, Jimmy Garnier, and Joanie Van de Walle, the MATLAB scripts implement the EvoDemo-Hyper MPM model and calculate adaptation rates from theoretical formulas.
+**MATLAB Code**: Developed by Stephanie Jenouvrier, Jimmy Garnier, and Joanie Van de Walle, the MATLAB scripts implement the EvoDemo-Hyper MPM model and calculate adaptation rates from theoretical formulas.
+
+**R Code**: Developed by Timothée Bonnet, the R scripts include code to run IBM simulations, run the EvoDemo-Hyper MPM model and calculate adaptation rates from theoretical formulas.
+The R-code is available as an independent R-package, that may be developed beyond the scope of the associated manuscript at https://src.koda.cnrs.fr/timotheebonnet/evodemohypermpm.git 
 
 ## File Descriptions
 
@@ -34,14 +36,14 @@ MATLAB Code (EvoDemo-Hyper MPM): Developed by Stephanie Jenouvrier, Jimmy Garnie
 
 ## How to Use
 
-**IBM Simulations (R)**: Use the R script `running_IBM.Rmd` to run IBM simulations. These scripts also include theoretical derivations `TheoreticalDerivations.R` for computing analytical adaptation rates.
-
 **EvoDemo-Hyper MPM (MATLAB)**: Run `CompRA_THEO_definition_methods_GITHUB.m` in MATLAB to compute analytical adaptation rates. 
 Run `Main_EvoDemo_Hyper_MPM_GITHUB.m` to compute adaptation rates using the EvoDemo-Hyper MPM.  Ensure that `Emat.m` and `BD_proj_mat.m` are in the same directory or accessible via your MATLAB path.
 
+**IBM Simulations (R)**: Use the R script `running_IBM.Rmd` to run IBM simulations. These scripts also include theoretical derivations `TheoreticalDerivations.R` for computing analytical adaptation rates.
+
 ## Authors
 
-Timothée Bonnet (R code for IBM simulations and theoretical derivations); Stéphanie Jenouvrier, Jimmy Garnier, Joanie Van de Walle (MATLAB code for EvoDemo-Hyper MPM)
+Stéphanie Jenouvrier, Jimmy Garnier, Joanie Van de Walle (MATLAB code for EvoDemo-Hyper MPM); Timothée Bonnet (R code for IBM simulations, translation of the EvoDemo-Hyper MPM and theoretical derivations from MATLAB).
 
 ## Citation
 

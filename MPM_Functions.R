@@ -161,15 +161,11 @@ MPM <- function(Beta = 0.15, h2 = 0.2, xp=4 ,timeA=100, g = 20, Vp = 1,  nind = 
   if((sum(Gle) - (1/(0.5 * binwidth_a))) > sqrt(density_tolerance)) {warning("The initial distribution of breeding values is too narrow given the coarsness of phenotypic classes; genetic change may not be computed accurately. You should probably increase h2, increase Vp, increase g or decrease xp. ")}
   
   # B matrix
-  Bik = array(data=0, dim = c(b,b,w,g)) # initiate empty cell array
-  Bik[1:g,1:g, , ] = diag(b)
-  B = BD_proj_mat(Bik);
-  
+  B = speye(b*w*g)
+
   # P matrix
-  Pij = array(data=0, dim=c(g,g,w,b)) # initiate empty cell array
-  Pij[1:g,1:g, , ] = diag(g)
-  P = BD_proj_mat(Pij);
-  
+  P = speye(b*w*g)
+
   # Simulate an initial dataframe for the vector of population size at t initial
   nind    = 100 # number of individuals to simulate
   
@@ -266,12 +262,13 @@ MPM <- function(Beta = 0.15, h2 = 0.2, xp=4 ,timeA=100, g = 20, Vp = 1,  nind = 
   Ujk[1,1,,] <- matrix(SJ_pheno*(1-Y_pheno), nrow = b, ncol = g, byrow = FALSE)
   Ujk[2,1,,] <- matrix(SJ_pheno*Y_pheno, nrow = b, ncol = g, byrow = FALSE) 
   Ujk[2,2,,] <- matrix(SA_pheno, nrow = b, ncol = g, byrow = FALSE) 
-  U = BD_proj_mat(Ujk)
+  U = Matrix(BD_proj_mat(Ujk), sparse = TRUE)
+  
   
   #%% R matrix
   Rjk <- array(data=0, dim=c(w,w,b,g)) 
   Rjk[1,2,,] <- matrix(F_pheno, nrow = b, ncol = g, byrow = FALSE) 
-  R <- BD_proj_mat(Rjk)
+  R <- Matrix(BD_proj_mat(Rjk), sparse = TRUE)
   
   #%% H matrix
   #% To construct the H matrix, we need the Ga matrix
@@ -288,7 +285,8 @@ MPM <- function(Beta = 0.15, h2 = 0.2, xp=4 ,timeA=100, g = 20, Vp = 1,  nind = 
   mij <- kronecker(array(data=1, dim = c(1,1,g)), emat)
   mij <- aperm(mij, c(1,3,2))
   Mij[,,1,] <- mij
-  M <- BD_proj_mat(Mij)
+  M <- Matrix(BD_proj_mat(Mij), sparse = TRUE)
+  
   
   #%% Compute N(t) correcting for stable population structure
   if(stabilise_population_structure){

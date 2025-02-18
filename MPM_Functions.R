@@ -47,6 +47,14 @@ BD_proj_mat <- function(B){
   return(A)
 }#end BD_proj_mat()
 
+
+speye <-
+  function(N){
+    require(Matrix)
+    return(sparseMatrix(i=(1:N),j=(1:N), x=rep(1,N) ) )
+  }#end speye()
+
+
 #' GVLE
 #' 
 #' Function to get the probability density distribution of breeding values from the normal distribution given the additive genetic variance
@@ -97,18 +105,30 @@ GVLE <- function(zz, Va){
 #' @param selectedrate the vital rate under selection
 #' 
 #' @param density_tolerance Threshold to trigger warnings about the distribution of breeding values being too narrow or too wide
+#'
+#' @param enforce_initial_lambda1 Boolean, default FALSE. Should the initial asymptotic population growth be exactly 1.
+#' 
+#' @param stabilise_population_structure Boolean, default TRUE. Should the simulation starts with stable stage structure.
 #' 
 #' 
 #' @export
 
 MPM <- function(Beta = 0.15, h2 = 0.2, xp=4 ,timeA=100, g = 20, Vp = 1,  nind = 100, 
                 Fe=0.2286, SA=0.95, SJ=0.8,  S0=0.8, Y=0.07, selectedrate="Fe", selectmodel="log", 
-                census = "prebreeding", density_tolerance = 10^(-5)){
+                census = "prebreeding", density_tolerance = 10^(-5), enforce_initial_lambda1=FALSE, 
+                stabilise_population_structure=TRUE){
   require(pracma) # for interpolation
   require(gsignal) # for 2D convolution
   require(purrr) # for reformatting output
+  require(tidyr) # for reformatting output
   
   if(h2<=0 | h2>=1) {stop("h2 must be strictly greater than 0 and strictly smaller than 1")}
+  if(h2 < ((xp/g)^2)) {warning("g is probably too low given h2 and xp. There are not enough breeding value classes to house Va below (xp/g)^2. Check estimates of Va and Vp in the output to see the realised h2. You may increase xp or decrease g.")}
+  
+  if(enforce_initial_lambda1){
+    Fe <- (1-SA)*(1-(1-Y)*SJ)/(Y*SJ) ##### TO GET LAMBDA 1
+    message(paste("I have adjusted Fe to", Fe, "because the enforce_initial_lambda1 is set to TRUE."))
+  }
   
   w = 2 # number of stages
   m = 3 # three dimensions: stage, breeding value, phenotype
@@ -162,8 +182,7 @@ MPM <- function(Beta = 0.15, h2 = 0.2, xp=4 ,timeA=100, g = 20, Vp = 1,  nind = 
   NN   = t(t(N_ve) * Nbv)
   
   ninit = aperm(array(data = NN/w, dim = c(g,g,w)), perm=c(3,2,1))
-  Ninit = t(t(as.vector(ninit)))
-  
+  Ninit = t(t(as.vector(ninit))) # here we compute initial population distribution without accounting for stable population structure. We will correct that later
   
   nit = timeA + 2 # number of years
   
@@ -271,7 +290,15 @@ MPM <- function(Beta = 0.15, h2 = 0.2, xp=4 ,timeA=100, g = 20, Vp = 1,  nind = 
   Mij[,,1,] <- mij
   M <- BD_proj_mat(Mij)
   
-  #%% Compute N(t)
+  #%% Compute N(t) correcting for stable population structure
+  if(stabilise_population_structure){
+  nninit =array(data = aperm(NN, c(2,1)), dim = c(1,b,g))
+  ninit  = outer(w_vec_mean, nninit, "*")
+  Ninit =  t(t(as.vector(ninit)))
+  }
+  
+  ninit = aperm(array(data = NN/w, dim = c(g,g,w)), perm=c(3,2,1))
+  
   N <- matrix(0, nrow = w*b*g, ncol=nit)
   N[,1] <- Ninit
   NN  <- array(0, c(w,b,g,nit))
@@ -316,14 +343,14 @@ MPM <- function(Beta = 0.15, h2 = 0.2, xp=4 ,timeA=100, g = 20, Vp = 1,  nind = 
     
     # Process #2.2 = Transmission of breeding  value
     Gle <- GVLE(0.5*(midpoint2_a), Va = Va)
-    Gle <- Gle / (sum(Gle) * 0.5*binwidth_a)  # normalise density
-    
+
     H1 <- conv2(nn, Gle * binwidth_a)  #identical with matlab
     H2  <- conv2(H1*binwidth_a, t(n)) # important to transpose n!
     bb2 <- seq(from=2*midpoint_a[1], to = 2*midpoint_a[length(midpoint_a)], by=(binwidth_a/2))
     
     H3 <- apply(H2, 2, function(x) interp1(bb2, x, midpoint_a))
-    nf[1,,] <- H3
+    nf[1,,] <- H3 * sum(n) / sum(H3) # normalise to expected number of individuals
+    
     
     # Rearrange for process #2.3
     NH <- as.vector(aperm(nf,c(3,1,2)))
@@ -343,20 +370,21 @@ MPM <- function(Beta = 0.15, h2 = 0.2, xp=4 ,timeA=100, g = 20, Vp = 1,  nind = 
   popsize <- apply(N, 2, sum)
   
   NN <- array(N,c(w,b,g,nit)) # pop structured by stage * breeding values; phenotype, time
-  ebvs <- apply(NN*binwidth_a, c(2,4), sum)
+  ebvs <- apply(NN, c(2,4), sum)
+  
   M_EBVS <- apply(ebvs,2, function(x) sum(x*midpoint_a)/sum(x))
   
-  sumebvs <- apply(ebvs*binwidth_a,2, sum)
+  sumebvs <- apply(ebvs,2, sum)
   m_ebvs2 <- t(apply(ebvs, 1, function(x) x / sumebvs))
   
-  ebvsJ <- aperm(array(apply(NN[1, , , ]*binwidth_a,c(1,3),sum), c(1,b,1,nit)),c(2,4,1,3))
+  ebvsJ <- aperm(array(apply(NN[1, , , ],c(1,3),sum), c(1,b,1,nit)),c(2,4,1,3))
   M_EBVSJ <- apply(ebvsJ, 2, function(x) sum(x*midpoint_a)/sum(x))
-  sumebvsJ <- apply(ebvsJ*binwidth_a,2, sum)
+  sumebvsJ <- apply(ebvsJ,2, sum)
   m_ebvsJ2 <- t(apply(ebvsJ, 1, function(x) x / sumebvsJ)) #distribution breeding value
   
-  ebvsA <- aperm(array(apply(NN[2, , , ]*binwidth_a,c(1,3),sum), c(1,b,1,nit)),c(2,4,1,3))
+  ebvsA <- aperm(array(apply(NN[2, , , ],c(1,3),sum), c(1,b,1,nit)),c(2,4,1,3))
   M_EBVSA <- apply(ebvsA, 2, function(x) sum(x*midpoint_a)/sum(x))# mean breeding value
-  sumebvsA <- apply(ebvsA*binwidth_a,2, sum)
+  sumebvsA <- apply(ebvsA,2, sum)
   m_ebvsA2 <- t(apply(ebvsA, 1, function(x) x / sumebvsA)) #distribution breeding value
   
   V <- mean(M_EBVS[2:timeA]-M_EBVS[1:timeA-1]) # Ebvs   = cumsum(ebvs*binwidth_a,1);
@@ -464,6 +492,7 @@ MPM_archive <- function(Beta = 0.15, h2 = 0.2, xp=4 ,timeA=100, g = 20, Vp = 1, 
   require(pracma) # for interpolation
   require(gsignal) # for 2D convolution
   require(purrr) # for reformatting output
+  require(tidyr) # for reformatting output
   
   if(h2<=0 | h2>=1) {stop("h2 must be strictly greater than 0 and strictly smaller than 1")}
   

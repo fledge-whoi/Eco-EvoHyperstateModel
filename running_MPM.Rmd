@@ -166,7 +166,6 @@ output2$pheno_distribution %>%
   theme(legend.position = "none")
 ```
 
-Using 40 classes takes much more RAM and CPU-time (On this machine, around 20 minutes allocating 14 CPUs), much more than the MATLAB version of the algorithm.
 
 The initial phenotype has a mean of zero. We set the range of phenotypes considered around that value with the parameter `xp=`. The default is 4. We can increase it to 8 so give more space for the trait to evolve:
 
@@ -217,6 +216,30 @@ output4$pheno_distribution %>%
 Eventually the phenotypic distribution hits the boundary of the highest possible phenotype, which makes the simulation unreliable from that point in time (around year 350 here).
 Also, note the absurd exponential population growth, evidenced by the y-axis. This is expected as the model consider only directional selection and does not contain density dependence.
 
+
+By default, the option `stabilise_population_structure` is set to `TRUE`, which means that the simulation starts with a stable stage structure. If you decide to set the parameter to `FALSE` you may observe transient oscillating dynamics:
+
+```{r}
+output5 <- MPM(Beta = 0, Fe = 10.9868, SA = 0.0365, SJ=0.0965, S0=0.0965, Y=0.9, g=10, stabilise_population_structure = FALSE)
+plot(output5$properties_per_year[,c("year","N")], type="l")
+```
+
+
+By default, the vital rates given as option values are used as is, which may correspond to a population that is initially growing or shrinking:
+
+```{r}
+output6 <- MPM(Beta = 0, Fe = 10.5, SA = 0.0365, SJ=0.0965, S0=0.0965, Y=0.9, g=10)
+plot(output6$properties_per_year[,c("year","N")])
+```
+
+The option `enforce_initial_lambda1`, if set to `TRUE`, will adjust `Fe` so that the initial asymptotic growth rate is exactly 1. A message will show the adjusted value of `Fe`:
+
+```{r}
+output6b <- MPM(Beta = 0, Fe = 10.5, SA = 0.0365, SJ=0.0965, S0=0.0965, Y=0.9, g=10, enforce_initial_lambda1 = TRUE)
+plot(output6b$properties_per_year[,c("year","N")])
+```
+
+
 ### Heritability and selection
 
 We can check that without selection there is no phenotypic or genetic change:
@@ -232,7 +255,7 @@ output_nobeta <- MPM(g = 20,
                SA = species_info$adult_survival[4],
                SJ = species_info$juvenile_survival[4],
                S0 = species_info$juvenile_survival[4],
-               Y = species_info$maturation_rate[4])
+               Y = species_info$maturation_rate[4], enforce_initial_lambda1 = TRUE)
 
 ```
 
@@ -257,24 +280,24 @@ ggplot(BV, aes(x=year, y=mean_breeding_value, color=age_class)) +
   geom_line() + theme_bw() 
 ```
 
-Note however that the population size tends to increase after an initial drop:
+Population size is constant
 
 ```{r}
 plot(output_nobeta$properties_per_year[,c("year", "N")])
 ```
 
-The asymptotic population growth rate is constant as there is no adaptation, but it is very slightly greater than 1:
+As is the asymptotic population growth rate
 
 ```{r}
 plot(output_nobeta$properties_per_year[,c("year", "lambda")])
 ```
 
 
-When there is selection but no heritability (we set the heritability to 0.001 as it cannot be exactly 0 or 1):
+When there is selection but a low heritability (we set the heritability to 0.01 as it cannot be exactly 0 or 1; and as the realised heritability is constrained by the number of classes `g` and the phenotypic range `xp` considered):
  
 ```{r}
 output_smallh2 <- MPM(g = 20, 
-               xp = 4,
+               xp = 2,
                timeA = 100,
                h2 = 0.01,
                Beta = 0.15,
@@ -283,19 +306,20 @@ output_smallh2 <- MPM(g = 20,
                SA = species_info$adult_survival[4],
                SJ = species_info$juvenile_survival[4],
                S0 = species_info$juvenile_survival[4],
-               Y = species_info$maturation_rate[4])
+               Y = species_info$maturation_rate[4], 
+               enforce_initial_lambda1 = TRUE)
 
 ```
 
-We get a warning message. The dynamic is not necessarily wrong, but maybe not what you expected:
+We get a warning message. The dynamic is not necessarily wrong, but maybe not exactly what you expected:
 
-population size increases more:
+population size increases a bit:
 
 ```{r}
 plot(output_smallh2$properties_per_year[,c("year", "N")])
 ```
 
-Due to an initial increase than stabilization of lambda:
+Due to an initial increase then stabilization of lambda:
 
 ```{r}
 plot(output_smallh2$properties_per_year[,c("year", "lambda")])
@@ -307,7 +331,8 @@ What we see is a little bit of adaptation, eroding away the additive genetic var
 plot(output_smallh2$properties_per_year[,c("year", "Va")])
 ```
 
-This erosion may be seen as realistic, but also as an artefact of the algorithm. We do not model genes explicitly, so we do not have a clear prediction of what should happen to Va.
+This erosion may be seen as realistic, but is also an artefact of the algorithm. We do not model genes explicitly, so we do not have a clear prediction of what should happen to Va.
+Also, note that the value of Va starts a bit above the 0.01 asked for. This is an artefact of the breeding value distribution being too narrow compared to the coarsness of the phenotypic classes. The realised initial Va cannot go below `((xp/g)^2)` and will tend to erode from values around that and below.
 
 ```{r}
 output_smallh2$pheno_distribution %>% 

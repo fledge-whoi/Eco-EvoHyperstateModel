@@ -48,11 +48,11 @@ BD_proj_mat <- function(B){
 }#end BD_proj_mat()
 
 
-speye <-
-  function(N){
+speye <- function(N){
     require(Matrix)
     return(sparseMatrix(i=(1:N),j=(1:N), x=rep(1,N) ) )
   }#end speye()
+
 
 
 #' GVLE
@@ -258,18 +258,66 @@ MPM <- function(Beta = 0.15, h2 = 0.2, xp=4 ,timeA=100, g = 20, Vp = 1,  nind = 
   
   # Get the matrices U, B, P for Utilde and R, H, M for Ftilde
   # U matrix
-  Ujk <- array(data=0, dim=c(w,w,b,g)) # initiate empty cell array
-  Ujk[1,1,,] <- matrix(SJ_pheno*(1-Y_pheno), nrow = b, ncol = g, byrow = FALSE)
-  Ujk[2,1,,] <- matrix(SJ_pheno*Y_pheno, nrow = b, ncol = g, byrow = FALSE) 
-  Ujk[2,2,,] <- matrix(SA_pheno, nrow = b, ncol = g, byrow = FALSE) 
-  U = Matrix(BD_proj_mat(Ujk), sparse = TRUE)
+  idr = c(1,2,2)
+  idc = c(1,1,2)
+  if (selectedrate=="Fe"){
+    Ujk = c(SJ*(1-Y),
+            SJ*Y,
+            SA)
+    Ui = sparseMatrix(i = idr,j = idc, x = Ujk)
+  }
+  nId = length(idr)
+  Idr = rep(0, times=nId*b*g)
+  Idc = rep(0, times=nId*b*g)
+  Uu = rep(0, times=nId*b*g)
+  
+  for (iu in 1:(b*g))
+  {
+    Ik = ((iu-1)*nId+1):(iu*nId)
+    Ptype <- arrayInd(.dim = c(b,g), ind = iu)[,2]
+    if (selectedrate=="SJ"){
+      Ujk = c(SJ_pheno[Ptype]*(1-Y),SJ_pheno[Ptype]*Y, SA)
+    }else{
+      if (selectedrate == "SA"){
+        Ujk = c(SJ*(1-Y),SJ*Y, SA_pheno[Ptype] )
+      }else{
+        if(selectedrate == "Y"){
+          Ujk = c(SJ*(1-Y_pheno[Ptype]),SJ*Y_pheno[Ptype], SA)
+        }
+      }
+    }
+    Ui = sparseMatrix(i = idr,j = idc, x = Ujk)
+    Idr[Ik] <- idr+(iu-1)*w
+    Idc[Ik] <- idc+(iu-1)*w
+    Uu[Ik] <- Ui[Ui!=0]
+  }
+  U = sparseMatrix(i = Idr, j = Idc, x = Uu, dims = c(b*w*g,b*w*g))
   
   
   #%% R matrix
-  Rjk <- array(data=0, dim=c(w,w,b,g)) 
-  Rjk[1,2,,] <- matrix(F_pheno, nrow = b, ncol = g, byrow = FALSE) 
-  R <- Matrix(BD_proj_mat(Rjk), sparse = TRUE)
-  
+  idr = 1
+  idc = 2
+  Rjk = F_pheno[1]
+  Ri = sparseMatrix(i = idr,j = idc,x = Rjk)
+  nId = length(idr)
+  Idr = rep(0, times=nId*b*g)
+  Idc = rep(0, times=nId*b*g)
+  Rr   = rep(0,times=nId*b*g)
+  for (ir in 1:(b*g))
+  {
+    Ik = ((ir-1)*nId+1):ir*nId;
+    if (selectedrate %in% c("Fe", "SJ"))
+    {
+      Ptype = arrayInd(ind = ir, .dim = c(b,g))[,2]
+      Rjk = F_pheno[Ptype]
+      Ri = sparseMatrix(i = idr, j = idc, x = Rjk)
+    }
+    Idr[Ik] = idr+(ir-1)*w
+    Idc[Ik] = idc+(ir-1)*w
+    Rr[Ik] = Ri[Ri!=0]
+  }
+  R = sparseMatrix(i = Idr,j = Idc, x = Rr, dims = c(b*w*g,b*w*g))
+
   #%% H matrix
   #% To construct the H matrix, we need the Ga matrix
   Vle <- Va
@@ -281,12 +329,28 @@ MPM <- function(Beta = 0.15, h2 = 0.2, xp=4 ,timeA=100, g = 20, Vp = 1,  nind = 
   emat <- t(exp(-(outer(midpoint_e, midpoint_a, FUN="-"))^2 / (2*Ve) ) * binwidth_a / apply(exp(-(outer(midpoint_e, midpoint_a, FUN="-"))^2/(2*Ve))*binwidth_e, 1, sum))
   
   # The matrix M, which is the transmission of maternal phenotype to offspring phenotype goes through the breeding values only
-  Mij <- array(data=0, dim=c(g,g,w,b))
-  mij <- kronecker(array(data=1, dim = c(1,1,g)), emat)
-  mij <- aperm(mij, c(1,3,2))
-  Mij[,,1,] <- mij
-  M <- Matrix(BD_proj_mat(Mij), sparse = TRUE)
-  
+   nId <-  g*g
+  Idr <-   rep(0, times=nId*b)
+  Idc <-  rep(0, times=nId*b)
+  Mm  <-  rep(0, times=nId*b)
+  inew <-  0
+  for (i in 1:b)
+  {
+    iold <- inew
+    idr <- which(emat[,i]!=0)
+    Mi_n <- emat[idr,i]
+    inew <-  length(idr)
+    idc <- rep(1:g, each=inew)
+    idr <- rep(idr, times=g)
+    Ik <- ((i-1)*nId+1):(((i-1)*nId+1)+inew*g-1)
+    Idr[Ik] <- idr+((i-1)*w*g)
+    Idc[Ik] <- idc+((i-1)*w*g)
+    Mm[Ik] <- rep(Mi_n, times=g)
+  }
+  Idr <- Idr[Idr != 0]
+  Idc <- Idc[Idc != 0]
+  Mm <- Mm[Mm != 0]
+  M = sparseMatrix(i = Idr, j = Idc, x = Mm, dims = c(b*w*g,b*w*g))
   
   #%% Compute N(t) correcting for stable population structure
   if(stabilise_population_structure){

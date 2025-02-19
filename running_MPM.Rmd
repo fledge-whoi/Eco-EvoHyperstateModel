@@ -121,7 +121,7 @@ The distribution of phenotypes every 20 years:
 pheno_distribution %>% filter(year %in% seq( from=1, to =101, by=20)) %>%
   ggplot(aes(x=phenotypic_midvalue, y=density, fill=as.factor(phenotypic_midvalue))) +
   geom_col() +
-  facet_wrap(~year, scales = "free_y", labeller = ) + #######################################################
+  facet_wrap(~year, scales = "free_y") + 
   theme_bw() +
   theme(legend.position = "none")
 ```
@@ -143,7 +143,7 @@ ggplot(BV, aes(x=year, y=mean_breeding_value, color=age_class)) +
 
 ### Phenotypic classes
 
-We can change the number of phenotypic and breeding value classes considered (`g=`). The default here was 20, which takes about 5 seconds on this machine. With only 10 classes the algorithm takes about 1 second:
+We can change the number of phenotypic and breeding value classes considered (`g=`). The default here was 20, which takes about 2 seconds on this machine. With only 10 classes the algorithm takes about 1 second:
 
 ```{r}
 output2 <- MPM(g = 10,
@@ -158,6 +158,29 @@ output2 <- MPM(g = 10,
 
 ```{r}
 output2$pheno_distribution %>% 
+  filter(year %in% seq( from=1, to =101, by=20)) %>%
+  ggplot(aes(x=phenotypic_midvalue, y=density, fill=as.factor(phenotypic_midvalue))) +
+  geom_col() +
+  facet_wrap(~year, scales = "free_y", labeller = ) + 
+  theme_bw() +
+  theme(legend.position = "none")
+```
+
+And about 8 seconds for 40 classes:
+
+```{r}
+output2b <- MPM(g = 40,
+               Fe = species_info$fecundity[1], 
+               SA = species_info$adult_survival[1],
+               SJ = species_info$juvenile_survival[1],
+               S0 = species_info$juvenile_survival[1],
+               Y = species_info$maturation_rate[1])
+
+```
+
+
+```{r}
+output2b$pheno_distribution %>% 
   filter(year %in% seq( from=1, to =101, by=20)) %>%
   ggplot(aes(x=phenotypic_midvalue, y=density, fill=as.factor(phenotypic_midvalue))) +
   geom_col() +
@@ -229,14 +252,14 @@ By default, the vital rates given as option values are used as is, which may cor
 
 ```{r}
 output6 <- MPM(Beta = 0, Fe = 10.5, SA = 0.0365, SJ=0.0965, S0=0.0965, Y=0.9, g=10)
-plot(output6$properties_per_year[,c("year","N")])
+plot(output6$properties_per_year[,c("year","N")], type="l")
 ```
 
 The option `enforce_initial_lambda1`, if set to `TRUE`, will adjust `Fe` so that the initial asymptotic growth rate is exactly 1. A message will show the adjusted value of `Fe`:
 
 ```{r}
 output6b <- MPM(Beta = 0, Fe = 10.5, SA = 0.0365, SJ=0.0965, S0=0.0965, Y=0.9, g=10, enforce_initial_lambda1 = TRUE)
-plot(output6b$properties_per_year[,c("year","N")])
+plot(output6b$properties_per_year[,c("year","N")], type="l")
 ```
 
 

@@ -21,7 +21,7 @@ Emat <- function(i,j,u){
 
 #' BD_proj_mat
 #' 
-#' Created a block-diagonal matrix from an array
+#' Create a block-diagonal matrix from an array
 #' 
 #' @param B array
 #' 
@@ -47,7 +47,13 @@ BD_proj_mat <- function(B){
   return(A)
 }#end BD_proj_mat()
 
-
+#' speye
+#' 
+#' Create a square identity sparse matrix
+#' 
+#' @param N Matrix dimension (number of rows, or equivalently numbers of column)
+#' 
+#' @export
 speye <- function(N){
     require(Matrix)
     return(sparseMatrix(i=(1:N),j=(1:N), x=rep(1,N) ) )
@@ -68,7 +74,6 @@ speye <- function(N){
 #' 
 #' 
 #' @export
-
 GVLE <- function(zz, Va){
   exp(-(zz^2)/Va)/sqrt(pi*Va)
 }
@@ -112,7 +117,6 @@ GVLE <- function(zz, Va){
 #' 
 #' 
 #' @export
-
 MPM <- function(Beta = 0.15, h2 = 0.2, xp=4 ,timeA=100, g = 20, Vp = 1,  nind = 100, 
                 Fe=0.2286, SA=0.95, SJ=0.8,  S0=0.8, Y=0.07, selectedrate="Fe", selectmodel="log", 
                 census = "prebreeding", density_tolerance = 10^(-5), enforce_initial_lambda1=FALSE, 

@@ -21,6 +21,8 @@ knitr::opts_chunk$set(echo = TRUE, eval=FALSE)
 
 This code is associated with the manuscript "Toward a unified approach to modeling adaptation among demographers and evolutionary ecologists" submitted to Methods in Ecology and Evolution (MEE) by Joanie Van de Walle, Jimmy Garnier, Timothée Bonnet and Stephanie Jenouvrier.
 
+It demonstrates how we used the Individual Based Model (IBM) as implemented in the functions `IBM_Function.R` to generate the results presented in the manuscript.
+
 # Set-up
 
 Load the packages needed to run the code:
@@ -60,7 +62,7 @@ species_info <- data.frame(species=1:5,
 
 ```
 
-Check expected asymptotic growth rate and stage structure
+We compute the expected asymptotic growth rate and stage structure at the begining of the simulation (they may change through time because of selection and genetic change).
 
 ```{r, eval=FALSE}
 species_info$lambda <- NA
@@ -124,20 +126,36 @@ If you do not want to use parallel computing, you should replace `foreach (j = 1
 
 ## Juvenile survival selection 
 
+We will comment the code in the case of selection on juvenile survival; the code for selection on other vital rates is almost identical except for the beta parameters and the name of the objects to which we save simulation outputs. 
+By default, the different beta are set to zero (`beta_s_j=0, beta_s_a=0, beta_f=0, beta_m=0`), meaning there is no selection. You can tell which vital rate is under selection based on which "beta" is non-zero, here `beta_s_j <- 0.15` means selection is on juvenile survival. 
+
+In case it is not already done, we load the IBM functions and the species vital rates:
 
 ```{r, eval=FALSE}
-source("FunctionSimulsIPMQG.R")
-
+source("IBM_Function.R")
 species_info <- read.csv("species_info.csv")
+```
 
-VP <- 1
-heritability <- 0.2
-beta_s_j <- 0.15
-init_pop_size <- 2*100 # multiply by 2 to account for males
-nb_years <- 100
 
+We define some input parameters:
+
+```{r, eval=FALSE}
+VP <- 1 # phenotypic variance in the trait under selection
+heritability <- 0.2 # heritability
+beta_s_j <- 0.15 # selection slope on the linear scale of the vital rate (log or logit)
+init_pop_size <- 2*100 # initial population size. The factor 2 accounts for males (not important)
+nb_years <- 100 # number of time steps for which to run the simulation
 K <- 2000 # safeguard carrying capacity to prevent very long simulations
+```
 
+
+We now loop over the five species, first extracting the species-specific vital rates, and then running the IBM 100 times (` foreach (j = 1:100) %dopar%` commands the parallel loop). 
+
+The function `main_simul() ` does all the computing. We then save the output to a folder `simulations` that would need to be created if it does not exist already.
+
+Note that we do not re-run the simulation if the output already exists in the folder. This allows to potentially start and stop the computation without re-doing all replicates.
+
+```{r, eval=FALSE}
 for (i in 1:nrow(species_info))
 {
   survival_j <- species_info$juvenile_survival[i]
@@ -166,7 +184,9 @@ for (i in 1:nrow(species_info))
 
 ### Post-hoc treatment of simulations
 
-Produce demographic data. This is quite slow (and could probably be optimized a lot).
+The IBM outputs contains tables of individual life-histories. For convenience, we post-process them to produce more different secondary outputs.
+
+First, we compute the population size for every year in each simulation, then we combine the different replicates together. This is quite slow (and could probably be optimized a lot).
 
 ```{r, eval=FALSE}
 
@@ -200,7 +220,8 @@ write.csv(pop_data_all_s_j, "simulations/pop_data_all_s_j.csv")
 
 ```
 
-Produce data on average breeding values by cohort or by year:
+Here, we compute breeding value average per cohort for each simulation replicates, and then combine the simulation replicates together:
+Here we tested two ways of averaging breeding values, either by cohort (`produce_evolution_data()`), or by year (`produce_evolution_data_byyear()`).
 
 ```{r, eval=FALSE}
 
@@ -242,12 +263,33 @@ write.csv(all_pop_by_s_j, file = "simulations/pop_evol_by_s_j.csv")
 
 ```
 
+### A quick look at the post-processed outputs
+
+```{r, eval=TRUE}
+library(tidyverse) # for wrangling and plotting
+```
+
+
+```{r, eval=TRUE}
+all_pop_s_j <- read_csv("../Code_QGMPM_MEE/simulations/pop_evol_s_j.csv")
+```
+
+We can visualise the change in mean breeding values through birth years for each of the 100 replicates in each species:
+
+```{r, eval=TRUE}
+ggplot(all_pop_s_j, aes(x=birthyear, y=mean_bv, by=as.factor(replicate))) +
+  geom_line(alpha=0.2, color="blue") +
+  facet_wrap(~species) + 
+  theme_bw() + 
+  theme(legend.position = "none")
+```
+
 
 
 ## Adult survival selection
 
 ```{r, eval=FALSE}
-source("FunctionSimulsIPMQG.R")
+source("IBM_Function.R")
 
 library(tidyverse)
 species_info <- read.csv("species_info.csv")
@@ -365,7 +407,7 @@ write.csv(all_pop_by_s_a, file = "simulations/pop_evol_by_s_a.csv")
 ## Fertility selection
 
 ```{r, eval=FALSE}
-source("FunctionSimulsIPMQG.R")
+source("IBM_Function.R")
 
 library(tidyverse)
 species_info <- read.csv("species_info.csv")
@@ -476,7 +518,7 @@ write.csv(all_pop_by_f, file = "simulations/pop_evol_by_f.csv")
 ## Maturity selection
 
 ```{r, eval=FALSE}
-source("FunctionSimulsIPMQG.R")
+source("IBM_Function.R")
 
 library(tidyverse)
 species_info <- read.csv("species_info.csv")

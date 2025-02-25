@@ -112,8 +112,8 @@ survfuction <- function(z=0, mature=0, beta_s_j=0, beta_s_a=0,
 #' 
 #' Main simulation function but requires (i) the input of InitialisePopulation() and (ii) its output to be completed by add_repro(). Use main_simul() to run the IBM instead.
 #'
-#' @param start 
-#' @param end 
+#' @param start year in which the simulation starts
+#' @param end year in which the simulation ends 
 #' @param fecundity 
 #' @param reprovarf 
 #' @param reprovarm 
@@ -267,7 +267,7 @@ RunPopulation <- function(start=1, end=100,
 
 #' Add information about individual lifetime reproductive success at the end of the simulation
 #'
-#' @param pop 
+#' @param pop Individual life-history table as produced by RunPopulation()
 #'
 #' @return
 #' @export
@@ -291,9 +291,9 @@ add_repro <- function(pop)
 
 
 
-#' Compute realized generation time
+#' Compute realized generation time as the mean age of parents at the time of their offspring birth
 #'
-#' @param pop 
+#' @param pop Individual life-history table as produced by RunPopulation()
 #'
 #' @return
 #' @export
@@ -318,7 +318,7 @@ generation_time <- function(pop){
 
 #' Compute population size for every year in the simulation
 #'
-#' @param pop 
+#' @param pop Individual life-history table as produced by RunPopulation()
 #' @param maxyear 
 #' @param minyear 
 #'
@@ -356,8 +356,8 @@ produce_pop_data <- function(pop, maxyear=NULL, minyear=NULL)
 
 #' Compute geometric average population growth rate
 #'
-#' @param pop_data 
-#' @param exclude 
+#' @param pop_data number of individuals per year
+#' @param exclude number of years to exclude from the calculation at the beginning 
 #'
 #' @return
 #' @export
@@ -372,7 +372,7 @@ geom_pop_growth <- function(pop_data, exclude=5)
 
 #' Compute breeding value average per cohort
 #'
-#' @param pop 
+#' @param pop Individual life-history table as produced by RunPopulation()
 #' @param maxyear 
 #' @param minyear 
 #' @param burnin 
@@ -415,7 +415,7 @@ produce_evolution_data <- function(pop, maxyear=NULL, minyear=NULL, burnin=0)
 
 #' Compute breeding value average per year
 #'
-#' @param pop 
+#' @param pop Individual life-history table as produced by RunPopulation()
 #' @param maxyear 
 #' @param minyear 
 #' @param burnin 
@@ -465,9 +465,9 @@ produce_evolution_data_byyear <- function(pop, maxyear=NULL, minyear=NULL, burni
 
 
 
-#' Produce individual data
+#' Produce individual-based data
 #'
-#' @param pop 
+#' @param pop Individual life-history table as produced by RunPopulation()
 #'
 #' @return
 #' @export

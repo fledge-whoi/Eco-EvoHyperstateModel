@@ -38,7 +38,7 @@ The R-code is available as an independent R-package, that may be developed beyon
 
 **EvoDemo-Hyper MPM**: 
 
-* MATLAB: Run `CompRA_THEO_definition_methods_GITHUB.m` in MATLAB to compute analytical adaptation rates. Run `Main_EvoDemo_Hyper_MPM_GITHUB.m` to compute adaptation rates using the EvoDemo-Hyper MPM.  Ensure that `Emat.m` and `BD_proj_mat.m` are in the same directory or accessible via your MATLAB path.
+* MATLAB: Run `CompRA_THEO_definition_methods_GITHUB.m` in MATLAB to compute analytical adaptation rates. Run `Main_EvoDemo_Hyper_MPM_GITHUB.m` to compute adaptation rates using the EvoDemo-Hyper MPM.  
 * R: See `running_MPM.Rmd` or `running_MPM.html`, which demonstrate how to use the functions defined in `MPM_Functions.R`
 
 **IBM Simulations (R only)**:

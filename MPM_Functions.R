@@ -55,8 +55,7 @@ BD_proj_mat <- function(B){
 #' 
 #' @export
 speye <- function(N){
-    require(Matrix)
-    return(sparseMatrix(i=(1:N),j=(1:N), x=rep(1,N) ) )
+    return(Matrix::sparseMatrix(i=(1:N),j=(1:N), x=rep(1,N) ) )
   }#end speye()
 
 
@@ -517,9 +516,9 @@ MPM <- function(Beta = 0.15, h2 = 0.2, xp=4 ,timeA=100, g = 20, Vp = 1,  nind = 
 
 
 
-#' MPM
+#' MPM_archive
 #' 
-#' Run a eco-evo deterministic matrix model
+#' Run a eco-evo deterministic matrix model. This is an older version of MPM() that did not use sparse matrices and lacks some checks.
 #' 
 #' @param Beta numeric, strength of selection on the scale of linear predictors
 #' 
@@ -871,6 +870,6 @@ MPM_archive <- function(Beta = 0.15, h2 = 0.2, xp=4 ,timeA=100, g = 20, Vp = 1, 
                  midpoint_phenotypic_class=midpoint_e)
   
   return(output)
-}#end MPM()
+}#end MPM_archive()
 
 

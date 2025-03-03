@@ -12,14 +12,20 @@ The EvoDemo-Hyper MPM model introduces a new approach that incorporates the gene
 
 **R Code**: Developed by Timothée Bonnet, the R scripts include code to run IBM simulations, run the EvoDemo-Hyper MPM model and calculate adaptation rates from theoretical formulas.
 The R-code is available as an independent R-package, that may be developed beyond the scope of the associated manuscript at https://src.koda.cnrs.fr/timotheebonnet/evodemohypermpm.git 
+You can install the R-package with 
+```
+library(remotes)
+install_gitlab(repo="timotheebonnet/evodemohypermpm",
+               host = "https://src.koda.cnrs.fr/")
+```
 
 ## File Descriptions
 
 **MATLAB Code Files**
 
 * `CompRA_THEO_definition_methods_GITHUB.m`: Main MATLAB script to calculate the rate of adaptation using analytical theoretical formulas.
-* `Emat.m` and `BD_proj_mat.m`: Functions for matrix operations used within the EvoDemo-Hyper MPM framework.
 * `Main_EvoDemo_Hyper_MPM_GITHUB.m`: Main function for executing the EvoDemo-Hyper MPM simulations.
+* `Main_EvoDemo_Hyper_MPM_variable_heritability_GITHUB.m`: Main function for executing the EvoDemo-Hyper MPM simulations with heritability that evolves in time.
 
 **R Code Files**
 
@@ -36,10 +42,19 @@ The R-code is available as an independent R-package, that may be developed beyon
 
 ## How to Use
 
-**EvoDemo-Hyper MPM (MATLAB)**: Run `CompRA_THEO_definition_methods_GITHUB.m` in MATLAB to compute analytical adaptation rates. 
-Run `Main_EvoDemo_Hyper_MPM_GITHUB.m` to compute adaptation rates using the EvoDemo-Hyper MPM.  Ensure that `Emat.m` and `BD_proj_mat.m` are in the same directory or accessible via your MATLAB path.
+**EvoDemo-Hyper MPM**: 
 
-**IBM Simulations (R)**: Use the R script `running_IBM.Rmd` to run IBM simulations. These scripts also include theoretical derivations `TheoreticalDerivations.R` for computing analytical adaptation rates.
+* MATLAB: Run `CompRA_THEO_definition_methods_GITHUB.m` in MATLAB to compute analytical adaptation rates. Run `Main_EvoDemo_Hyper_MPM_GITHUB.m` to compute adaptation rates using the EvoDemo-Hyper MPM.  
+* R: See `running_MPM.Rmd` or `running_MPM.html`, which demonstrate how to use the functions defined in `MPM_Functions.R`
+
+**IBM Simulations (R only)**:
+
+* Use the R script `running_IBM.Rmd` to run IBM simulations as defined in `IBM_Function.R`.
+
+**Theoretical derivations**:
+
+* Matlab: Run `CompRA_THEO_definition_methods_GITHUB.m`
+* R: Run `TheoreticalDerivations.R` for computing analytical adaptation rates.
 
 ## Authors
 

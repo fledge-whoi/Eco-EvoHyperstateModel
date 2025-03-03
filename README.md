@@ -18,7 +18,6 @@ The R-code is available as an independent R-package, that may be developed beyon
 **MATLAB Code Files**
 
 * `CompRA_THEO_definition_methods_GITHUB.m`: Main MATLAB script to calculate the rate of adaptation using analytical theoretical formulas.
-* `Emat.m` and `BD_proj_mat.m`: Functions for matrix operations used within the EvoDemo-Hyper MPM framework.
 * `Main_EvoDemo_Hyper_MPM_GITHUB.m`: Main function for executing the EvoDemo-Hyper MPM simulations.
 * `Main_EvoDemo_Hyper_MPM_variable_heritability_GITHUB.m`: Main function for executing the EvoDemo-Hyper MPM simulations with heritability that evolves in time.
 

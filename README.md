@@ -12,6 +12,12 @@ The EvoDemo-Hyper MPM model introduces a new approach that incorporates the gene
 
 **R Code**: Developed by Timothée Bonnet, the R scripts include code to run IBM simulations, run the EvoDemo-Hyper MPM model and calculate adaptation rates from theoretical formulas.
 The R-code is available as an independent R-package, that may be developed beyond the scope of the associated manuscript at https://src.koda.cnrs.fr/timotheebonnet/evodemohypermpm.git 
+You can install the R-package with 
+```
+library(remotes)
+install_gitlab(repo="timotheebonnet/evodemohypermpm",
+               host = "https://src.koda.cnrs.fr/")
+```
 
 ## File Descriptions
 

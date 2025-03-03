@@ -55,8 +55,7 @@ BD_proj_mat <- function(B){
 #' 
 #' @export
 speye <- function(N){
-    require(Matrix)
-    return(sparseMatrix(i=(1:N),j=(1:N), x=rep(1,N) ) )
+    return(Matrix::sparseMatrix(i=(1:N),j=(1:N), x=rep(1,N) ) )
   }#end speye()
 
 

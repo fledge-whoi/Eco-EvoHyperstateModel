@@ -89,12 +89,14 @@ LAMBDA0 = zeros(ndata,nvital);
 LAMBDA  = zeros(ndata,nit,nvital);
 V_ADAPT = zeros(ndata,nvital);
 T_GEN   = zeros(ndata,nvital);
-
+VA = zeros(ndata,nit,nvital);
+VP = zeros(ndata,nit,nvital);
+H2t = zeros(ndata,nit,nvital);
 %% VITAL RATES
-for ivital = xtheta:xtheta
+for ivital = 1:xtheta
 
     %% SPECIES
-    for idata = xspecies:xspecies
+    for idata = 1:xspecies
         F  = Data{idata}(1);
         SA = Data{idata}(2);
         SJ = Data{idata}(3);
@@ -173,15 +175,16 @@ for ivital = xtheta:xtheta
 
         %% Get the matrices U, B, P for Utilde and R, H, M for Ftilde
         %% U matrix
+       % Ujk = [SJ_pheno.*(1-Y_pheno),SJ_pheno.*Y_pheno, SA_pheno ];
         idr = [1,2,2]; idc = [1,1,2];
+        % Ui = sparse(idr,idc,Ujk);
         nId = length(idr);
         Idr = zeros(nId*b*g,1); Idc = zeros(nId*b*g,1);
         Uu   = zeros(nId*b*g,1);
         for iu = 1:b*g
             Ik = ((iu-1)*nId+1):iu*nId;
             if (ivital ==1)
-                Ujk = [SJ_pheno.*(1-Y_pheno),SJ_pheno.*Y_pheno, SA_pheno ];
-                
+                Ujk = [SJ_pheno.*(1-Y_pheno),SJ_pheno.*Y_pheno, SA_pheno ];   
             elseif (ivital==2)
                 [~,Ptype] = ind2sub([b,g],iu);
                 Ujk = [SJ_pheno(1,Ptype).*(1-Y_pheno),SJ_pheno(1,Ptype).*Y_pheno, SA_pheno ];
@@ -258,6 +261,12 @@ for ivital = xtheta:xtheta
 
         N      = zeros(w*b*g, nit);
         N(:,1) = Ninit;
+        Va_hat = Va;
+        Vp_hat = Vp;
+        VA(1)  = Va_hat;
+        VP(1)  = Vp_hat;
+        h2t    = Va_hat/Vp_hat;
+        H2t(idata,1,ivital) = h2t;
 
         for i = 2:nit
             % Live individual transitions
@@ -307,6 +316,34 @@ for ivital = xtheta:xtheta
             NH = reshape(permute(nf,[3,1,2]),w*g*b,1);
 
             % Process # 2.3 = Attribution of offspring phenotype
+            %% Compute the variable heritability
+            Ve = (1-h2t)*Vp_hat;
+            % To construct the M matrix, we need the Ge matrix
+            % For each breeding value, what is the potential distribution of offspring phenotype? - Here we add noise (Ve) to the breeding value to obtain offspring phenotype
+            emat = exp(-(midpoint_e'-midpoint_a).^2./(2*Ve))*binwidth_a./sum(exp(-(midpoint_e'-midpoint_a).^2./(2*Ve)).*binwidth_e,1);
+
+            % The matrix M, which is the transmission of maternal phenotype to offspring phenotype goes through the breeding values only
+            nId = g*g;
+            Idr = zeros(nId*b,1); Idc = zeros(nId*b,1);
+            Mm  = zeros(nId*b,1);
+            inew = 0;
+            for im = 1:b
+                iold = inew;
+                % Ik = ((i-1)*nId+1):i*nId;
+                % Mi = emat(:,i);
+                [idr,~,Mi_n] = find(emat(:,im));
+                inew =  length(idr);
+                idc = reshape(repmat(1:g,inew,1),g*inew,1);
+                idr = reshape(repmat(idr,g,1),g*inew,1);
+                Ik = ((im-1)*nId+1):(((im-1)*nId+1)+inew*g-1);
+                Idr(Ik) = idr+((im-1)*w*g); Idc(Ik) = idc+((im-1)*w*g);
+                Mm(Ik) = reshape(repmat(Mi_n,g,1),g*inew,1);
+            end
+            Idr = nonzeros(Idr);
+            Idc = nonzeros(Idc);
+            Mm = nonzeros(Mm);
+            M = sparse(Idr,Idc,Mm,b*w*g,b*w*g);
+
             NM = M*NH;
 
             % Rearrange back to initial configuration (state within breeding value within phenotype)
@@ -315,7 +352,24 @@ for ivital = xtheta:xtheta
             NF_final = nm_r;
 
             % Add all processes to get total population size
-            N(:,i) = NF_final+NU_final;
+            N_final = NF_final+NU_final;
+            N(:,i) = N_final;
+
+            %% Variances computation
+            Nn     = reshape(N_final,[w,b,g]); %pop strutured by stage * breding values; phenotype, time
+            % Breeding value distribution
+            ebvs   = permute(sum(Nn*binwidth_a,[1,3]),[2,1,3]);
+            m_ebvs = sum(ebvs.*midpoint_a',1)./sum(ebvs,1);
+            % Phenotype distribution
+            pheno  = permute(sum(Nn*binwidth_e,[1,2]),[3,1,2]);
+            mz     = sum(pheno.*midpoint_e',1)./sum(pheno,1); % phenotype moyen
+            % Variances: Additive geentic | Phenotypic
+            Va_hat = sum(ebvs.*(midpoint_a'-m_ebvs).^2,1)./sum(ebvs,1); % estimated variance
+            VA(idata,i,ivital) = Va_hat;
+            Vp_hat = sum(pheno.*(midpoint_e'-mz).^2,1)./sum(pheno,1);   % estimated variance
+            VP(idata,i,ivital) = Vp_hat;
+            h2t = min(Va_hat/Vp_hat,0.99);
+            H2t(idata,i,ivital) = h2t;
         end
         %%
         NN     = reshape(N,[w,b,g,nit]); %pop strutured by stage * breding values; phenotype, time

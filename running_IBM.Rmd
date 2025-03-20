@@ -23,7 +23,7 @@ This code is associated with the manuscript "Toward a unified approach to modeli
 
 It demonstrates how we used the Individual Based Model (IBM) as implemented in the functions `IBM_Function.R` to generate the results presented in the manuscript.
 
-Re-running all simulations might take up to a few days depending on how many cores are available. You can download a the simulations at ().
+Re-running all simulations might take up to a few days depending on how many cores are available. You can download a compressed file containing pre-run simulations at https://sdrive.cnrs.fr/s/yWYWNegiQWoAQfj.
 
 
 # Set-up

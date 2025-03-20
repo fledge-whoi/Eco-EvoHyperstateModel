@@ -23,6 +23,9 @@ This code is associated with the manuscript "Toward a unified approach to modeli
 
 It demonstrates how we used the Individual Based Model (IBM) as implemented in the functions `IBM_Function.R` to generate the results presented in the manuscript.
 
+Re-running all simulations might take up to a few days depending on how many cores are available. You can download a compressed file containing pre-run simulations at https://sdrive.cnrs.fr/s/yWYWNegiQWoAQfj.
+
+
 # Set-up
 
 Load the packages needed to run the code:
@@ -151,11 +154,13 @@ K <- 2000 # safeguard carrying capacity to prevent very long simulations
 
 We now loop over the five species, first extracting the species-specific vital rates, and then running the IBM 100 times (` foreach (j = 1:100) %dopar%` commands the parallel loop). 
 
-The function `main_simul() ` does all the computing. We then save the output to a folder `simulations` that would need to be created if it does not exist already.
+The function `main_simul() ` does all the computing. We then save the output to a folder `simulations` that is created in the first line of the code chunk if it does not already exist.
 
 Note that we do not re-run the simulation if the output already exists in the folder. This allows to potentially start and stop the computation without re-doing all replicates.
 
 ```{r, eval=FALSE}
+if( !dir.exists("simulations") ) dir.create("simulations") )
+
 for (i in 1:nrow(species_info))
 {
   survival_j <- species_info$juvenile_survival[i]

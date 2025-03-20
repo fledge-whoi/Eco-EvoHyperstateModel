@@ -1565,6 +1565,9 @@ Jenouvrier.</p>
 <p>It demonstrates how we used the Individual Based Model (IBM) as
 implemented in the functions <code>IBM_Function.R</code> to generate the
 results presented in the manuscript.</p>
+<p>Re-running all simulations might take up to a few days depending on
+how many cores are available. You can download a compressed file
+containing pre-run simulations at <a href="https://sdrive.cnrs.fr/s/yWYWNegiQWoAQfj" class="uri">https://sdrive.cnrs.fr/s/yWYWNegiQWoAQfj</a>.</p>
 <div id="set-up" class="section level1" number="1">
 <h1><span class="header-section-number">1</span> Set-up</h1>
 <p>Load the packages needed to run the code:</p>
@@ -1573,7 +1576,7 @@ results presented in the manuscript.</p>
 <span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="fu">library</span>(tidyverse) <span class="co"># data wrangling</span></span></code></pre></div>
 <p>R-session and computer state when compiling this file:</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">sessionInfo</span>()</span></code></pre></div>
-<pre><code>## R version 4.4.2 (2024-10-31)
+<pre><code>## R version 4.4.3 (2025-02-28)
 ## Platform: x86_64-pc-linux-gnu
 ## Running under: Ubuntu 22.04.5 LTS
 ## 
@@ -1593,14 +1596,15 @@ results presented in the manuscript.</p>
 ## tzcode source: system (glibc)
 ## 
 ## attached base packages:
-## [1] stats     graphics  grDevices utils     datasets  methods   base     
+## [1] stats     graphics  grDevices datasets  utils     methods   base     
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] digest_0.6.35     R6_2.5.1          fastmap_1.2.0     xfun_0.44        
-##  [5] cachem_1.1.0      knitr_1.47        htmltools_0.5.8.1 rmarkdown_2.27   
-##  [9] lifecycle_1.0.4   cli_3.6.2         sass_0.4.9        jquerylib_0.1.4  
-## [13] compiler_4.4.2    rstudioapi_0.16.0 tools_4.4.2       evaluate_0.23    
-## [17] bslib_0.7.0       yaml_2.3.8        rlang_1.1.4       jsonlite_1.8.8</code></pre>
+##  [1] digest_0.6.37     R6_2.6.1          fastmap_1.2.0     xfun_0.51        
+##  [5] cachem_1.1.0      knitr_1.50        htmltools_0.5.8.1 rmarkdown_2.29   
+##  [9] lifecycle_1.0.4   cli_3.6.4         sass_0.4.9        renv_1.1.1       
+## [13] jquerylib_0.1.4   compiler_4.4.3    rstudioapi_0.17.1 tools_4.4.3      
+## [17] evaluate_1.0.3    bslib_0.9.0       yaml_2.3.10       jsonlite_1.9.1   
+## [21] rlang_1.1.5</code></pre>
 <p>Load all IBM simulation and post-treatment functions:</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">source</span>(<span class="st">&quot;IBM_Function.R&quot;</span>)</span></code></pre></div>
 </div>
@@ -1684,34 +1688,37 @@ species-specific vital rates, and then running the IBM 100 times
 (<code>foreach (j = 1:100) %dopar%</code> commands the parallel
 loop).</p>
 <p>The function <code>main_simul()</code> does all the computing. We
-then save the output to a folder <code>simulations</code> that would
-need to be created if it does not exist already.</p>
+then save the output to a folder <code>simulations</code> that is
+created in the first line of the code chunk if it does not already
+exist.</p>
 <p>Note that we do not re-run the simulation if the output already
 exists in the folder. This allows to potentially start and stop the
 computation without re-doing all replicates.</p>
-<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(species_info))</span>
-<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>{</span>
-<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>  survival_j <span class="ot">&lt;-</span> species_info<span class="sc">$</span>juvenile_survival[i]</span>
-<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>  survival_a <span class="ot">&lt;-</span> species_info<span class="sc">$</span>adult_survival[i]</span>
-<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>  maturation <span class="ot">&lt;-</span> species_info<span class="sc">$</span>maturation_rate[i]</span>
-<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>  fecundity <span class="ot">&lt;-</span> species_info<span class="sc">$</span>fertility[i]<span class="sc">*</span><span class="dv">2</span> <span class="co"># multiply by 2 to account for males # in the case of Juv survival we need to use Fertility instead of Fecundity</span></span>
-<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>  init_prop_juv <span class="ot">&lt;-</span> species_info<span class="sc">$</span>juv_prop[i]</span>
-<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a></span>
-<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>  <span class="fu">foreach</span> (<span class="at">j =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">100</span>) <span class="sc">%dopar%</span></span>
-<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a>  {</span>
-<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a>    <span class="cf">if</span>(<span class="sc">!</span> <span class="fu">paste0</span>(<span class="st">&quot;pop_sel_species_s_j_&quot;</span>,i, <span class="st">&quot;_rep_&quot;</span>,j) <span class="sc">%in%</span> <span class="fu">list.files</span>(<span class="st">&quot;simulations&quot;</span>) )</span>
-<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a>      {</span>
-<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a>      pop_sel <span class="ot">&lt;-</span> <span class="fu">main_simul</span>(<span class="at">init_pop_size=</span>init_pop_size, </span>
-<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a>                         <span class="at">start =</span> <span class="dv">1</span>, <span class="at">end =</span> nb_years, </span>
-<span id="cb12-15"><a href="#cb12-15" tabindex="-1"></a>                         <span class="at">fecundity =</span> fecundity, <span class="at">VP =</span> VP, <span class="at">VA =</span> heritability<span class="sc">*</span>VP,</span>
-<span id="cb12-16"><a href="#cb12-16" tabindex="-1"></a>                         <span class="at">maturation_rate =</span> maturation,</span>
-<span id="cb12-17"><a href="#cb12-17" tabindex="-1"></a>                         <span class="at">surv_j =</span> survival_j, <span class="at">surv_a =</span> survival_a, <span class="at">beta_s_j =</span> beta_s_j, <span class="at">init_prop_juv=</span>init_prop_juv, </span>
-<span id="cb12-18"><a href="#cb12-18" tabindex="-1"></a>                         <span class="at">K=</span>K)</span>
-<span id="cb12-19"><a href="#cb12-19" tabindex="-1"></a>      <span class="fu">save</span>(pop_sel, <span class="at">file =</span> <span class="fu">paste0</span>(<span class="st">&quot;simulations/pop_sel_species_s_j_&quot;</span>,i, <span class="st">&quot;_rep_&quot;</span>,j))</span>
-<span id="cb12-20"><a href="#cb12-20" tabindex="-1"></a>    }</span>
-<span id="cb12-21"><a href="#cb12-21" tabindex="-1"></a>  <span class="fu">print</span>(j)</span>
-<span id="cb12-22"><a href="#cb12-22" tabindex="-1"></a>  }</span>
-<span id="cb12-23"><a href="#cb12-23" tabindex="-1"></a>}</span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="cf">if</span>( <span class="sc">!</span><span class="fu">dir.exists</span>(<span class="st">&quot;simulations&quot;</span>) ) <span class="fu">dir.create</span>(<span class="st">&quot;simulations&quot;</span>) <span class="er">)</span></span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a></span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(species_info))</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>{</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>  survival_j <span class="ot">&lt;-</span> species_info<span class="sc">$</span>juvenile_survival[i]</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>  survival_a <span class="ot">&lt;-</span> species_info<span class="sc">$</span>adult_survival[i]</span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>  maturation <span class="ot">&lt;-</span> species_info<span class="sc">$</span>maturation_rate[i]</span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>  fecundity <span class="ot">&lt;-</span> species_info<span class="sc">$</span>fertility[i]<span class="sc">*</span><span class="dv">2</span> <span class="co"># multiply by 2 to account for males # in the case of Juv survival we need to use Fertility instead of Fecundity</span></span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>  init_prop_juv <span class="ot">&lt;-</span> species_info<span class="sc">$</span>juv_prop[i]</span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a></span>
+<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a>  <span class="fu">foreach</span> (<span class="at">j =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">100</span>) <span class="sc">%dopar%</span></span>
+<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a>  {</span>
+<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a>    <span class="cf">if</span>(<span class="sc">!</span> <span class="fu">paste0</span>(<span class="st">&quot;pop_sel_species_s_j_&quot;</span>,i, <span class="st">&quot;_rep_&quot;</span>,j) <span class="sc">%in%</span> <span class="fu">list.files</span>(<span class="st">&quot;simulations&quot;</span>) )</span>
+<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a>      {</span>
+<span id="cb12-15"><a href="#cb12-15" tabindex="-1"></a>      pop_sel <span class="ot">&lt;-</span> <span class="fu">main_simul</span>(<span class="at">init_pop_size=</span>init_pop_size, </span>
+<span id="cb12-16"><a href="#cb12-16" tabindex="-1"></a>                         <span class="at">start =</span> <span class="dv">1</span>, <span class="at">end =</span> nb_years, </span>
+<span id="cb12-17"><a href="#cb12-17" tabindex="-1"></a>                         <span class="at">fecundity =</span> fecundity, <span class="at">VP =</span> VP, <span class="at">VA =</span> heritability<span class="sc">*</span>VP,</span>
+<span id="cb12-18"><a href="#cb12-18" tabindex="-1"></a>                         <span class="at">maturation_rate =</span> maturation,</span>
+<span id="cb12-19"><a href="#cb12-19" tabindex="-1"></a>                         <span class="at">surv_j =</span> survival_j, <span class="at">surv_a =</span> survival_a, <span class="at">beta_s_j =</span> beta_s_j, <span class="at">init_prop_juv=</span>init_prop_juv, </span>
+<span id="cb12-20"><a href="#cb12-20" tabindex="-1"></a>                         <span class="at">K=</span>K)</span>
+<span id="cb12-21"><a href="#cb12-21" tabindex="-1"></a>      <span class="fu">save</span>(pop_sel, <span class="at">file =</span> <span class="fu">paste0</span>(<span class="st">&quot;simulations/pop_sel_species_s_j_&quot;</span>,i, <span class="st">&quot;_rep_&quot;</span>,j))</span>
+<span id="cb12-22"><a href="#cb12-22" tabindex="-1"></a>    }</span>
+<span id="cb12-23"><a href="#cb12-23" tabindex="-1"></a>  <span class="fu">print</span>(j)</span>
+<span id="cb12-24"><a href="#cb12-24" tabindex="-1"></a>  }</span>
+<span id="cb12-25"><a href="#cb12-25" tabindex="-1"></a>}</span></code></pre></div>
 <div id="post-hoc-treatment-of-simulations" class="section level3" number="3.1.1">
 <h3><span class="header-section-number">3.1.1</span> Post-hoc treatment
 of simulations</h3>
@@ -1797,8 +1804,8 @@ post-processed outputs</h3>
 ## ✔ dplyr     1.1.4     ✔ readr     2.1.5
 ## ✔ forcats   1.0.0     ✔ stringr   1.5.1
 ## ✔ ggplot2   3.5.1     ✔ tibble    3.2.1
-## ✔ lubridate 1.9.3     ✔ tidyr     1.3.1
-## ✔ purrr     1.0.2     
+## ✔ lubridate 1.9.4     ✔ tidyr     1.3.1
+## ✔ purrr     1.0.4     
 ## ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
 ## ✖ dplyr::filter() masks stats::filter()
 ## ✖ dplyr::lag()    masks stats::lag()
